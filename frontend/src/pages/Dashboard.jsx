@@ -307,9 +307,13 @@ export default function Dashboard() {
           </div>
           <div className="te-sub">
             {entry
-              ? [entry.temperature ? `${entry.temperature}°C` : null]
+              ? [
+                  entry.temperature ? `${entry.temperature}°C` : null,
+                  entry.sleep ? `Sen ${entry.sleep} h` : null,
+                  entry.steps ? `${entry.steps} kroków` : null,
+                ]
                   .filter(Boolean)
-                  .concat(symptomList.slice(0, 3))
+                  .concat(symptomList.slice(0, 2))
                   .join(" · ") || "Dodaj szczegóły dnia"
               : "Zapisz nastrój, objawy i temperaturę w dzienniku"}
           </div>

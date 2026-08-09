@@ -55,6 +55,29 @@ export default function StatsPage() {
         </div>
       </div>
 
+      {(stats.average_sleep || stats.total_steps || stats.average_activity) && (
+        <div className="stat-grid">
+          <div className="stat-box">
+            <div className="num">
+              {stats.average_sleep !== null ? stats.average_sleep : "—"}
+            </div>
+            <div className="lbl">śr. sen (h)</div>
+          </div>
+          <div className="stat-box">
+            <div className="num">
+              {stats.total_steps ? stats.total_steps.toLocaleString("pl-PL") : "—"}
+            </div>
+            <div className="lbl">kroki łącznie</div>
+          </div>
+          <div className="stat-box">
+            <div className="num">
+              {stats.average_activity !== null ? stats.average_activity : "—"}
+            </div>
+            <div className="lbl">śr. aktywność (min)</div>
+          </div>
+        </div>
+      )}
+
       <div className="card mt">
         <h2>Temperatura bazowa</h2>
         {temps.length < 2 ? (

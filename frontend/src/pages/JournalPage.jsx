@@ -19,12 +19,22 @@ const EMPTY = {
   notes: "",
   water: 0,
   sleep: "",
+  sleep_quality: "",
+  steps: "",
   activity: 0,
   libido: "",
   stress: "",
   mucus: "",
   weight: "",
 };
+
+const SLEEP_QUALITY = [
+  "Bardzo słaba",
+  "Słaba",
+  "Średnia",
+  "Dobra",
+  "Bardzo dobra",
+];
 
 const POPULAR_SYMPTOMS = [
   "Ból brzucha",
@@ -74,6 +84,8 @@ export default function JournalPage() {
           notes: e.notes ?? "",
           water: e.water ?? 0,
           sleep: e.sleep ?? "",
+          sleep_quality: e.sleep_quality ?? "",
+          steps: e.steps ?? "",
           activity: e.activity ?? 0,
           libido: e.libido ?? "",
           stress: e.stress ?? "",
@@ -116,6 +128,8 @@ export default function JournalPage() {
           notes: form.notes || null,
           water: form.water ? Number(form.water) : null,
           sleep: form.sleep ? Number(form.sleep) : null,
+          sleep_quality: form.sleep_quality || null,
+          steps: form.steps ? Number(form.steps) : null,
           activity: form.activity ? Number(form.activity) : null,
           libido: form.libido || null,
           stress: form.stress ? Number(form.stress) : null,
@@ -293,20 +307,6 @@ export default function JournalPage() {
             </div>
             <div className="vital-field">
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
-                Sen (godziny)
-              </label>
-              <input
-                type="number"
-                step="0.5"
-                min="0"
-                max="16"
-                value={form.sleep}
-                onChange={(e) => setForm({ ...form, sleep: e.target.value })}
-                placeholder="np. 7.5"
-              />
-            </div>
-            <div className="vital-field">
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
                 Woda (szklanki)
               </label>
               <div className="stepper">
@@ -335,6 +335,58 @@ export default function JournalPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="activity" size={17} />
+            </span>
+            <b>Ruch i sen</b>
+          </div>
+          <div className="vital-grid">
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Sen (godziny)
+              </label>
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                max="16"
+                value={form.sleep}
+                onChange={(e) => setForm({ ...form, sleep: e.target.value })}
+                placeholder="np. 7.5"
+              />
+            </div>
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Jakość snu
+              </label>
+              <select
+                value={form.sleep_quality}
+                onChange={(e) => setForm({ ...form, sleep_quality: e.target.value })}
+              >
+                <option value="">—</option>
+                {SLEEP_QUALITY.map((q) => (
+                  <option key={q}>{q}</option>
+                ))}
+              </select>
+            </div>
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Kroki
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="60000"
+                value={form.steps}
+                onChange={(e) => setForm({ ...form, steps: e.target.value })}
+                placeholder="np. 8000"
+              />
             </div>
             <div className="vital-field">
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>

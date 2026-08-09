@@ -243,27 +243,32 @@ def create_app():
             "stress": data.get("stress"),
             "mucus": data.get("mucus"),
             "weight": data.get("weight"),
+            "steps": data.get("steps"),
+            "sleep_quality": data.get("sleep_quality"),
         }
         if existing:
             db.execute(
                 "UPDATE entries SET temperature=?, mood=?, symptoms=?, notes=?, "
-                "water=?, sleep=?, activity=?, libido=?, stress=?, mucus=?, weight=? "
+                "water=?, sleep=?, activity=?, libido=?, stress=?, mucus=?, weight=?, "
+                "steps=?, sleep_quality=? "
                 "WHERE id=?",
                 (
                     vals["temperature"], vals["mood"], vals["symptoms"], vals["notes"],
                     vals["water"], vals["sleep"], vals["activity"], vals["libido"],
-                    vals["stress"], vals["mucus"], vals["weight"], existing["id"],
+                    vals["stress"], vals["mucus"], vals["weight"], vals["steps"],
+                    vals["sleep_quality"], existing["id"],
                 ),
             )
         else:
             db.execute(
                 "INSERT INTO entries (user_id, date, temperature, mood, symptoms, notes, "
-                "water, sleep, activity, libido, stress, mucus, weight) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "water, sleep, activity, libido, stress, mucus, weight, steps, sleep_quality) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     user_id, day, vals["temperature"], vals["mood"], vals["symptoms"],
                     vals["notes"], vals["water"], vals["sleep"], vals["activity"],
                     vals["libido"], vals["stress"], vals["mucus"], vals["weight"],
+                    vals["steps"], vals["sleep_quality"],
                 ),
             )
         return jsonify(db.query_one("SELECT * FROM entries WHERE user_id = ? AND date = ?", (user_id, day)))
@@ -343,6 +348,9 @@ def create_app():
                 syms = []
             for s in syms:
                 symptoms[s] = symptoms.get(s, 0) + 1
+        sleeps = [e["sleep"] for e in entries if e["sleep"] is not None]
+        activities = [e["activity"] for e in entries if e["activity"] is not None]
+        steps_list = [e["steps"] for e in entries if e["steps"]]
         return jsonify({
             "cycle_count": len(starts),
             "average_cycle": round(sum(lengths) / len(lengths), 1) if lengths else None,
@@ -352,6 +360,9 @@ def create_app():
             "moods": moods,
             "symptoms": symptoms,
             "entry_count": len(entries),
+            "average_sleep": round(sum(sleeps) / len(sleeps), 1) if sleeps else None,
+            "average_activity": round(sum(activities) / len(activities), 1) if activities else None,
+            "total_steps": sum(steps_list),
         })
 
     # ---------- Artykuły (sekcja Inspiracje) ----------
