@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCalendar } from "../hooks.js";
 import { api } from "../api/client.js";
@@ -53,6 +53,7 @@ export default function CalendarPage() {
   const [selStatus, setSelStatus] = useState(null);
   const [pillTime, setPillTime] = useState("12:00");
   const [busy, setBusy] = useState(false);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     Promise.all([
@@ -89,9 +90,13 @@ export default function CalendarPage() {
 
   useEffect(() => {
     if (view !== "month") return;
-    const el = document.getElementById(`cal-month-${anchor.y}-${anchor.m}`);
-    if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [view, anchor, data]);
+    const el = scrollRef.current;
+    if (!el) return;
+    const target = document.getElementById(`cal-month-${anchor.y}-${anchor.m}`);
+    if (target) {
+      el.scrollTo({ top: Math.max(0, target.offsetTop), behavior: "auto" });
+    }
+  }, [view, anchor.y, anchor.m, data]);
 
   const periodDays = useMemo(
     () =>
@@ -249,7 +254,7 @@ export default function CalendarPage() {
       </div>
 
       {view === "month" ? (
-        <div className="cal-scroll">
+        <div className="cal-scroll" ref={scrollRef}>
           {monthList.map((mn) => {
             const cells = monthCells(mn.y, mn.m);
             return (

@@ -315,7 +315,6 @@ export default function JournalPage() {
                 className={`mood-opt ${form.moods.includes(m.key) ? "on" : ""}`}
                 onClick={() => toggleMood(m.key)}
               >
-                <span className="mo-emoji">{m.emoji}</span>
                 <span className="mo-label">{m.label}</span>
               </button>
             ))}

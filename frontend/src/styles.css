@@ -1088,7 +1088,6 @@ select {
   max-width: 480px;
   height: 100dvh;
   z-index: 60;
-  background: linear-gradient(180deg, #f9e9f1 0%, #f3d9e7 100%);
   overflow: hidden;
 }
 .cal-top {
@@ -1140,13 +1139,13 @@ select {
 }
 .cal-scroll {
   position: absolute;
-  inset: 64px 0 0;
+  inset: calc(64px + env(safe-area-inset-top)) 0 0;
   overflow-y: auto;
   scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
 }
 .cal-month {
-  min-height: calc(100dvh - 64px);
+  min-height: calc(100dvh - 64px - env(safe-area-inset-top));
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
@@ -1158,6 +1157,7 @@ select {
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
   padding: 6px 0 10px;
 }
 .cal-month-title span {
@@ -1206,10 +1206,12 @@ select {
   font-size: 14.5px;
   font-weight: 600;
   color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 .cal-sday.period .cnum {
-  background: var(--pink-500);
-  color: #fff;
+  background: rgba(229, 72, 126, 0.12);
+  border: 1.5px dashed var(--pink-500);
+  color: var(--pink-600);
   font-weight: 800;
 }
 .cal-sday.today .cnum {
@@ -1236,7 +1238,7 @@ select {
 }
 .cal-year-wrap {
   position: absolute;
-  inset: 64px 0 0;
+  inset: calc(64px + env(safe-area-inset-top)) 0 0;
   overflow-y: auto;
   padding: 4px 14px 28px;
 }
@@ -1562,26 +1564,21 @@ select {
   border: 1px solid transparent;
   background: var(--surface-2);
   border-radius: 13px;
-  padding: 7px 2px 6px;
+  padding: 11px 4px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
   transition: transform 0.1s ease, background 0.15s ease;
 }
 .mood-opt:active {
   transform: scale(0.94);
 }
-.mood-opt .mo-emoji {
-  font-size: 19px;
-  line-height: 1;
-}
 .mood-opt .mo-label {
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 600;
   color: var(--ink-2);
   text-align: center;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 .mood-opt.on {
   background: var(--pink-100);
