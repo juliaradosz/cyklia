@@ -70,11 +70,6 @@ export default function ProfilePage() {
   }
 
   const initial = (user?.display_name || user?.email || "?")[0] || "?";
-  const pillSub = pillMode
-    ? pillName
-      ? `${pillName} · schemat ${pillCycle}+${pillBreak} · ${pillTime}`
-      : `Schemat ${pillCycle}+${pillBreak} · ${pillTime}`
-    : "Wyłączona";
 
   if (view === "cycle") {
     return (
@@ -313,23 +308,13 @@ export default function ProfilePage() {
           <span className="set-ico">
             <Icon name="repeat" size={19} />
           </span>
-          <span className="set-main">
-            <span className="sm-title">Cykl i okres</span>
-            <span className="sm-sub">
-              {cycle} dni cyklu · {period} dni okresu
-            </span>
-          </span>
-          <Icon name="chevron-right" size={18} className="set-go" />
+          <span className="sm-title">Cykl i okres</span>
         </button>
         <button className="set-row" onClick={() => setView("pill")}>
           <span className="set-ico">
             <Icon name="pill" size={19} />
           </span>
-          <span className="set-main">
-            <span className="sm-title">Antykoncepcja</span>
-            <span className="sm-sub">{pillSub}</span>
-          </span>
-          <Icon name="chevron-right" size={18} className="set-go" />
+          <span className="sm-title">Antykoncepcja</span>
         </button>
       </div>
 
@@ -339,21 +324,13 @@ export default function ProfilePage() {
           <span className="set-ico neutral">
             <Icon name="user" size={19} />
           </span>
-          <span className="set-main">
-            <span className="sm-title">Konto</span>
-            <span className="sm-sub">Imię, e-mail i wylogowanie</span>
-          </span>
-          <Icon name="chevron-right" size={18} className="set-go" />
+          <span className="sm-title">Konto</span>
         </button>
         <button className="set-row" onClick={() => setView("privacy")}>
           <span className="set-ico neutral">
             <Icon name="lock" size={19} />
           </span>
-          <span className="set-main">
-            <span className="sm-title">Dane i prywatność</span>
-            <span className="sm-sub">Gdzie przechowujemy Twoje dane</span>
-          </span>
-          <Icon name="chevron-right" size={18} className="set-go" />
+          <span className="sm-title">Dane i prywatność</span>
         </button>
       </div>
 

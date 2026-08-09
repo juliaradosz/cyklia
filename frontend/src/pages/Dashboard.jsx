@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useCalendar, addPeriod, removePeriod } from "../hooks.js";
+import { emojiFor } from "../inspiration.js";
 import {
   todayISO,
   daysBetween,
@@ -320,7 +321,11 @@ export default function Dashboard() {
               to={`/inspiracje/${a.id}`}
               className={`inspo-tile tile-${i % 4}`}
             >
-              {a.title}
+              <span className="inspo-emoji">{emojiFor(a)}</span>
+              <span className="inspo-title">{a.title}</span>
+              <span className="inspo-meta">
+                {a.read_minutes ? `${a.read_minutes} min czytania` : "artykuł"}
+              </span>
             </Link>
           ))}
         </div>

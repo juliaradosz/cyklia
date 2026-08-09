@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import Icon from "./Icon.jsx";
 
 const NAV = [
@@ -11,9 +11,10 @@ const NAV = [
 ];
 
 export default function Layout() {
+  const { pathname } = useLocation();
   return (
     <>
-      <main className="page">
+      <main className={`page${pathname === "/" ? " page--flush" : ""}`}>
         <Outlet />
       </main>
       <nav className="bottom-nav">

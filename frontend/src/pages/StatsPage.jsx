@@ -48,6 +48,15 @@ function Spark({ points, tip }) {
   );
 }
 
+function Num({ value, label }) {
+  return (
+    <div className="stat-num">
+      <div className="num">{value}</div>
+      <div className="lbl">{label}</div>
+    </div>
+  );
+}
+
 export default function StatsPage() {
   const [stats, setStats] = useState(null);
 
@@ -78,53 +87,39 @@ export default function StatsPage() {
         </div>
       </div>
 
-      <div className="stat-grid">
-        <div className="stat-box">
-          <div className="num">
-            {stats.average_cycle !== null ? stats.average_cycle : "—"}
-          </div>
-          <div className="lbl">śr. długość cyklu (dni)</div>
-        </div>
-        <div className="stat-box">
-          <div className="num">
-            {stats.average_period !== null ? stats.average_period : "—"}
-          </div>
-          <div className="lbl">śr. długość okresu (dni)</div>
-        </div>
-        <div className="stat-box">
-          <div className="num">{stats.cycle_count}</div>
-          <div className="lbl">zapisane okresy</div>
-        </div>
-        <div className="stat-box">
-          <div className="num">{stats.entry_count}</div>
-          <div className="lbl">wpisy w dzienniku</div>
-        </div>
+      <div className="stats-num-row">
+        <Num
+          value={stats.average_cycle !== null ? stats.average_cycle : "—"}
+          label="śr. długość cyklu"
+        />
+        <Num
+          value={stats.average_period !== null ? stats.average_period : "—"}
+          label="śr. długość okresu"
+        />
+        <Num value={stats.cycle_count} label="zapisane okresy" />
       </div>
 
-      {(stats.average_sleep || stats.total_steps || stats.average_activity) && (
-        <div className="stat-grid">
-          <div className="stat-box">
-            <div className="num">
-              {stats.average_sleep !== null ? stats.average_sleep : "—"}
-            </div>
-            <div className="lbl">śr. sen (h)</div>
-          </div>
-          <div className="stat-box">
-            <div className="num">
-              {stats.total_steps ? stats.total_steps.toLocaleString("pl-PL") : "—"}
-            </div>
-            <div className="lbl">kroki łącznie</div>
-          </div>
-          <div className="stat-box">
-            <div className="num">
-              {stats.average_activity !== null ? stats.average_activity : "—"}
-            </div>
-            <div className="lbl">śr. aktywność (min)</div>
-          </div>
+      <div className="stats-num-row">
+        <Num value={stats.entry_count} label="wpisy w dzienniku" />
+        <Num
+          value={stats.average_sleep !== null ? stats.average_sleep : "—"}
+          label="śr. sen (h)"
+        />
+        <Num
+          value={
+            stats.total_steps ? stats.total_steps.toLocaleString("pl-PL") : "—"
+          }
+          label="kroki łącznie"
+        />
+      </div>
+
+      {stats.average_activity !== null && (
+        <div className="stats-num-row single">
+          <Num value={stats.average_activity} label="śr. aktywność (min)" />
         </div>
       )}
 
-      <div className="card mt">
+      <div className="stats-sec">
         <h2>Temperatura bazowa</h2>
         {temps.length < 2 ? (
           <p className="muted">
@@ -155,7 +150,7 @@ export default function StatsPage() {
         )}
       </div>
 
-      <div className="card">
+      <div className="stats-sec">
         <h2>Nastroje</h2>
         {moodKeys.length === 0 ? (
           <p className="muted">Zapisuj nastrój w dzienniku, by zobaczyć podsumowanie.</p>
@@ -179,7 +174,7 @@ export default function StatsPage() {
         )}
       </div>
 
-      <div className="card">
+      <div className="stats-sec">
         <h2>Najczęstsze objawy</h2>
         {symKeys.length === 0 ? (
           <p className="muted">Zaznaczaj objawy w dzienniku, by zobaczyć statystyki.</p>
@@ -198,7 +193,7 @@ export default function StatsPage() {
         )}
       </div>
 
-      <div className="card">
+      <div className="stats-sec">
         <h2>Sen i ruch a faza cyklu</h2>
         {stats.phases && stats.phases.length ? (
           <>
@@ -228,7 +223,7 @@ export default function StatsPage() {
         )}
       </div>
 
-      <div className="card">
+      <div className="stats-sec">
         <h2>Sen i kroki — ostatnie 14 dni</h2>
         <p className="muted" style={{ fontSize: 12 }}>
           Sen (h)

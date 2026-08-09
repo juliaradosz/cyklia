@@ -200,7 +200,19 @@ export default function CalendarPage() {
       return [];
     }
   })();
-  const mood = entry?.mood ? MOODS.find((m) => m.key === entry.mood) : null;
+  const moods = (() => {
+    if (!entry?.mood) return [];
+    let keys;
+    try {
+      keys = JSON.parse(entry.mood);
+    } catch {
+      keys = null;
+    }
+    if (!Array.isArray(keys)) keys = [entry.mood];
+    return keys
+      .map((k) => MOODS.find((m) => m.key === k))
+      .filter(Boolean);
+  })();
   const sexItems = (() => {
     try {
       return entry?.sex ? JSON.parse(entry.sex) : [];
@@ -358,7 +370,9 @@ export default function CalendarPage() {
             <div className="sheet-row">
               <span className="sr-label">Nastrój</span>
               <span className="sr-value">
-                {mood ? `${mood.emoji} ${mood.label}` : "—"}
+                {moods.length
+                  ? moods.map((m) => `${m.emoji} ${m.label}`).join(", ")
+                  : "—"}
               </span>
             </div>
             <div className="sheet-row">

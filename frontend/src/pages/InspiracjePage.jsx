@@ -51,12 +51,18 @@ function Card({ article }) {
   );
 }
 
-function Carousel({ items, emptyText }) {
-  if (!items.length) return <p className="muted">{emptyText}</p>;
+function Chips({ options, value, onChange }) {
   return (
-    <div className="insp-row">
-      {items.map((a) => (
-        <Card key={a.id} article={a} />
+    <div className="cat-chips">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          className={`cat-chip${value === o.key ? " on" : ""}`}
+          onClick={() => onChange(o.key)}
+        >
+          {o.emoji && <span className="cc-emoji">{o.emoji}</span>}
+          {o.label}
+        </button>
       ))}
     </div>
   );
@@ -68,6 +74,7 @@ export default function InspiracjePage() {
   const [query, setQuery] = useState("");
   const [savedList, setSavedList] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [cat, setCat] = useState("wszystkie");
 
   useEffect(() => {
     api("/articles")
@@ -96,6 +103,28 @@ export default function InspiracjePage() {
     [articles, cal]
   );
 
+  const chips = [
+    { key: "wszystkie", label: "Wszystkie", emoji: "✨" },
+    { key: "zapisane", label: "Zapisane", emoji: "♥" },
+    ...CATEGORY_ORDER.map((c) => ({
+      key: c,
+      label: c,
+      emoji: categoryMeta(c).emoji,
+    })),
+  ];
+
+  let shown = [];
+  let shownTag = "Wszystkie inspiracje";
+  if (cat === "zapisane") {
+    shown = savedList;
+    shownTag = "Zapisane";
+  } else if (cat === "wszystkie") {
+    shown = articles;
+  } else {
+    shown = articles.filter((a) => a.category === cat);
+    shownTag = cat;
+  }
+
   if (!loaded) return <div className="center-screen">Ładowanie…</div>;
 
   return (
@@ -116,7 +145,13 @@ export default function InspiracjePage() {
             <div className="for-you-desc">{phaseInfo.desc}</div>
           </div>
         </div>
-        <Carousel items={forYou} emptyText="Dodaj okres w kalendarzu, by dopasować treści." />
+        {forYou.length > 0 && (
+          <div className="insp-row">
+            {forYou.map((a) => (
+              <Card key={a.id} article={a} />
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="search-wrap">
@@ -149,38 +184,29 @@ export default function InspiracjePage() {
         </div>
       ) : (
         <>
-          {savedList.length > 0 && (
-            <section className="insp-section">
-              <div className="cat-head">
-                <span className="cat-emoji" style={{ background: "var(--surface-2)" }}>
-                  <Icon name="heart" size={20} style={{ color: "var(--pink-600)" }} />
+          <Chips options={chips} value={cat} onChange={setCat} />
+          {cat === "zapisane" && savedList.length === 0 ? (
+            <p className="muted">Zapisz artykuły serduszkiem, by mieć je pod ręką.</p>
+          ) : (
+            <>
+              <div className="cat-head" style={{ marginBottom: 12 }}>
+                <span className="cat-emoji">
+                  {chips.find((c) => c.key === cat)?.emoji || "✨"}
                 </span>
                 <div>
-                  <h2>Zapisane</h2>
-                  <div className="cat-tagline">Twoje ulubione artykuły</div>
-                </div>
-              </div>
-              <Carousel items={savedList} />
-            </section>
-          )}
-
-          {CATEGORY_ORDER.map((cat) => {
-            const items = articles.filter((a) => a.category === cat);
-            if (!items.length) return null;
-            const meta = categoryMeta(cat);
-            return (
-              <section key={cat} className="insp-section">
-                <div className="cat-head">
-                  <span className="cat-emoji">{meta.emoji}</span>
-                  <div>
-                    <h2>{cat}</h2>
-                    <div className="cat-tagline">{meta.tagline}</div>
+                  <h2>{shownTag}</h2>
+                  <div className="cat-tagline">
+                    {shown.length} {shown.length === 1 ? "artykuł" : "artykułów"}
                   </div>
                 </div>
-                <Carousel items={items} />
-              </section>
-            );
-          })}
+              </div>
+              <div className="insp-grid">
+                {shown.map((a) => (
+                  <Card key={a.id} article={a} />
+                ))}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

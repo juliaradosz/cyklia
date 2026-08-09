@@ -14,7 +14,7 @@ import Icon from "../components/Icon.jsx";
 
 const EMPTY = {
   temperature: "",
-  mood: "",
+  moods: [],
   symptoms: [],
   notes: "",
   water: 0,
@@ -77,9 +77,18 @@ export default function JournalPage() {
     try {
       const e = await api(`/entries/${day}`);
       if (e) {
+        let moods = [];
+        if (e.mood) {
+          try {
+            const p = JSON.parse(e.mood);
+            moods = Array.isArray(p) ? p : [e.mood];
+          } catch {
+            moods = [e.mood];
+          }
+        }
         setForm({
           temperature: e.temperature ?? "",
-          mood: e.mood ?? "",
+          moods,
           symptoms: e.symptoms ? JSON.parse(e.symptoms) : [],
           notes: e.notes ?? "",
           water: e.water ?? 0,
@@ -115,6 +124,15 @@ export default function JournalPage() {
     }));
   }
 
+  function toggleMood(k) {
+    setForm((f) => ({
+      ...f,
+      moods: f.moods.includes(k)
+        ? f.moods.filter((x) => x !== k)
+        : [...f.moods, k],
+    }));
+  }
+
   async function save(e) {
     e.preventDefault();
     setBusy(true);
@@ -123,7 +141,7 @@ export default function JournalPage() {
         method: "PUT",
         body: {
           temperature: form.temperature ? Number(form.temperature) : null,
-          mood: form.mood || null,
+          mood: form.moods.length ? JSON.stringify(form.moods) : null,
           symptoms: form.symptoms,
           notes: form.notes || null,
           water: form.water ? Number(form.water) : null,
@@ -145,8 +163,19 @@ export default function JournalPage() {
     }
   }
 
-  function moodEmoji(key) {
-    return MOODS.find((m) => m.key === key)?.emoji || "🙂";
+  function moodEmojis(raw) {
+    if (!raw) return "";
+    let keys;
+    try {
+      keys = JSON.parse(raw);
+    } catch {
+      keys = [raw];
+    }
+    if (!Array.isArray(keys)) keys = [raw];
+    return keys
+      .slice(0, 3)
+      .map((k) => MOODS.find((m) => m.key === k)?.emoji || "🙂")
+      .join(" ");
   }
 
   const symptomsToShow = showAllSymptoms
@@ -209,8 +238,8 @@ export default function JournalPage() {
               <button
                 key={m.key}
                 type="button"
-                className={`mood-opt ${form.mood === m.key ? "on" : ""}`}
-                onClick={() => setForm({ ...form, mood: m.key })}
+                className={`mood-opt ${form.moods.includes(m.key) ? "on" : ""}`}
+                onClick={() => toggleMood(m.key)}
               >
                 <span className="mo-emoji">{m.emoji}</span>
                 <span className="mo-label">{m.label}</span>
@@ -496,7 +525,7 @@ export default function JournalPage() {
               <div style={{ minWidth: 0 }}>
                 <div className="er-date">{formatPL(e.date)}</div>
                 <div className="er-sub">
-                  {moodEmoji(e.mood)} {e.mood || "brak nastroju"}
+                  {moodEmojis(e.mood) || "brak nastroju"}
                   {e.temperature ? ` · ${e.temperature}°C` : ""}
                   {syms.length ? ` · ${syms.slice(0, 3).join(", ")}` : ""}
                 </div>

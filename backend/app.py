@@ -372,12 +372,24 @@ def create_app():
                 if 1 <= pl <= 21:
                     period_lengths.append(pl)
         temps = [(e["date"], e["temperature"]) for e in entries if e["temperature"]]
+        import json as _json
+
         moods = {}
         for e in entries:
-            if e["mood"]:
-                moods[e["mood"]] = moods.get(e["mood"], 0) + 1
+            if not e["mood"]:
+                continue
+            keys = e["mood"]
+            if isinstance(keys, str) and keys.strip().startswith("["):
+                try:
+                    keys = _json.loads(keys)
+                except (ValueError, TypeError):
+                    keys = [e["mood"]]
+            if not isinstance(keys, list):
+                keys = [keys]
+            for k in keys:
+                if k:
+                    moods[k] = moods.get(k, 0) + 1
         symptoms = {}
-        import json as _json
 
         for e in entries:
             try:
@@ -489,8 +501,8 @@ def create_app():
                 "Faza lutealna": "luteal",
             }.get(ph, "any")
         rows = db.query(
-            "SELECT id, slug, title, category, summary, badge, tone, illustration, phase "
-            "FROM articles ORDER BY id"
+            "SELECT id, slug, title, category, summary, read_minutes, badge, "
+            "tone, illustration, phase FROM articles ORDER BY id"
         )
         saved = _saved_ids(user_id)
         matched = [r for r in rows if r["phase"] == target]
