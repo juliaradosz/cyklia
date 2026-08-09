@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+backend/cyklia.db
+backend/secret.key
+
+# Node
+node_modules/
+# UWAGA: frontend/dist/ JEST wgrywane do repozytorium (PythonAnywhere nie ma Node.js)
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
