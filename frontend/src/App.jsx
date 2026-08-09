@@ -9,6 +9,7 @@ import JournalPage from "./pages/JournalPage.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
 import InspiracjePage from "./pages/InspiracjePage.jsx";
+import InspiracjeCategoryPage from "./pages/InspiracjeCategoryPage.jsx";
 import InspirationArticlePage from "./pages/InspirationArticlePage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="statystyki" element={<StatsPage />} />
         <Route path="czat" element={<ChatPage />} />
         <Route path="inspiracje" element={<InspiracjePage />} />
+        <Route path="inspiracje/kategoria/:category" element={<InspiracjeCategoryPage />} />
         <Route path="inspiracje/:id" element={<InspirationArticlePage />} />
         <Route path="profil" element={<ProfilePage />} />
       </Route>
