@@ -433,36 +433,7 @@ def create_app():
         message = (data.get("message") or "").strip()
         if not message:
             return jsonify({"error": "Wiadomość nie może być pusta"}), 400
-        if sess["title"] == "Nowa rozmowa":
-            user_msgs = db.query_one(
-                "SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ? AND role = 'user'",
-                (sid,),
-            )
-            if not user_msgs["c"]:
-                title = message if len(message) <= 42 else message[:42] + "…"
-                db.execute("UPDATE chat_sessions SET title = ? WHERE id = ?", (title, sid))
-        history = [
-            {"role": m["role"], "content": m["content"]}
-            for m in db.query(
-                "SELECT role, content FROM chat_messages WHERE session_id = ? "
-                "ORDER BY id DESC LIMIT 10",
-                (sid,),
-            )
-        ]
-        history.reverse()
-        answer = chat_reply(message, history, _chat_context(user_id))
-        now = db.now_iso()
-        db.execute(
-            "INSERT INTO chat_messages (user_id, session_id, role, content, created_at) "
-            "VALUES (?, ?, 'user', ?, ?)",
-            (user_id, sid, message, now),
-        )
-        db.execute(
-            "INSERT INTO chat_messages (user_id, session_id, role, content, created_at) "
-            "VALUES (?, ?, 'assistant', ?, ?)",
-            (user_id, sid, answer, now),
-        )
-        db.execute("UPDATE chat_sessions SET updated_at = ? WHERE id = ?", (now, sid))
+        answer = _chat_send(user_id, sid, message)
         return jsonify({"reply": answer})
 
     @app.patch("/api/chat/sessions/<int:sid>")
@@ -486,6 +457,33 @@ def create_app():
         db.execute("DELETE FROM chat_messages WHERE session_id = ?", (sid,))
         db.execute("DELETE FROM chat_sessions WHERE id = ? AND user_id = ?", (sid, user_id))
         return jsonify({"ok": True})
+
+    # ---------- Czat: kompatybilność ze starą aplikacją (cache w przeglądarce) ----------
+
+    @app.get("/api/chat/history")
+    @auth.auth_required
+    def chat_history_compat(user_id):
+        _ensure_chat_sessions(user_id)
+        sid = _latest_chat_session_id(user_id)
+        rows = db.query(
+            "SELECT role, content FROM chat_messages WHERE session_id = ? "
+            "ORDER BY id DESC LIMIT 50",
+            (sid,),
+        )
+        rows.reverse()
+        return jsonify(rows)
+
+    @app.post("/api/chat")
+    @auth.auth_required
+    def chat_compat(user_id):
+        data = request.get_json(silent=True) or {}
+        message = (data.get("message") or "").strip()
+        if not message:
+            return jsonify({"error": "Wiadomość nie może być pusta"}), 400
+        _ensure_chat_sessions(user_id)
+        sid = _latest_chat_session_id(user_id)
+        answer = _chat_send(user_id, sid, message)
+        return jsonify({"reply": answer})
 
     # ---------- Serwowanie frontendu (po zbudowaniu) ----------
 
@@ -606,6 +604,63 @@ def _get_chat_session(user_id, sid):
         "SELECT id, title FROM chat_sessions WHERE id = ? AND user_id = ?",
         (sid, user_id),
     )
+
+
+def _latest_chat_session_id(user_id):
+    sess = db.query_one(
+        "SELECT id FROM chat_sessions WHERE user_id = ? "
+        "ORDER BY updated_at DESC LIMIT 1",
+        (user_id,),
+    )
+    if sess:
+        return sess["id"]
+    now = db.now_iso()
+    return db.execute(
+        "INSERT INTO chat_sessions (user_id, title, created_at, updated_at) "
+        "VALUES (?, 'Nowa rozmowa', ?, ?)",
+        (user_id, now, now),
+    )
+
+
+def _chat_send(user_id, sid, message):
+    """Zapisuje wiadomość użytkownika, generuje odpowiedź i aktualizuje sesję."""
+    sess = db.query_one(
+        "SELECT id, title FROM chat_sessions WHERE id = ? AND user_id = ?",
+        (sid, user_id),
+    )
+    if not sess:
+        raise LookupError("Nie znaleziono rozmowy")
+    if sess["title"] == "Nowa rozmowa":
+        user_msgs = db.query_one(
+            "SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ? AND role = 'user'",
+            (sid,),
+        )
+        if not user_msgs["c"]:
+            title = message if len(message) <= 42 else message[:42] + "…"
+            db.execute("UPDATE chat_sessions SET title = ? WHERE id = ?", (title, sid))
+    history = [
+        {"role": m["role"], "content": m["content"]}
+        for m in db.query(
+            "SELECT role, content FROM chat_messages WHERE session_id = ? "
+            "ORDER BY id DESC LIMIT 10",
+            (sid,),
+        )
+    ]
+    history.reverse()
+    answer = chat_reply(message, history, _chat_context(user_id))
+    now = db.now_iso()
+    db.execute(
+        "INSERT INTO chat_messages (user_id, session_id, role, content, created_at) "
+        "VALUES (?, ?, 'user', ?, ?)",
+        (user_id, sid, message, now),
+    )
+    db.execute(
+        "INSERT INTO chat_messages (user_id, session_id, role, content, created_at) "
+        "VALUES (?, ?, 'assistant', ?, ?)",
+        (user_id, sid, answer, now),
+    )
+    db.execute("UPDATE chat_sessions SET updated_at = ? WHERE id = ?", (now, sid))
+    return answer
 
 
 def _ensure_chat_sessions(user_id):
