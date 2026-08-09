@@ -5,6 +5,7 @@ import {
   todayISO,
   addDays,
   formatPL,
+  nowHM,
   MOODS,
   SYMPTOMS,
   LIBIDO,
@@ -61,6 +62,10 @@ export default function JournalPage() {
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showAllSymptoms, setShowAllSymptoms] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [jumpDate, setJumpDate] = useState(today);
+  const [pillLog, setPillLog] = useState(null);
+  const [pillTimeInput, setPillTimeInput] = useState(nowHM());
 
   async function loadList() {
     try {
@@ -106,6 +111,12 @@ export default function JournalPage() {
       }
     } catch {
       setForm(EMPTY);
+    }
+    try {
+      const p = await api(`/pills/log?date=${day}`);
+      setPillLog(p);
+    } catch {
+      setPillLog(null);
     }
   }
 
@@ -190,42 +201,105 @@ export default function JournalPage() {
     if (date < today) loadEntry(addDays(date, 1));
   }
 
+  async function logPill() {
+    try {
+      const p = await api("/pills/log", {
+        method: "POST",
+        body: { date, time: pillTimeInput },
+      });
+      setPillLog(p);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function undoPill() {
+    try {
+      const p = await api("/pills/log", { method: "DELETE", body: { date } });
+      setPillLog(p);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function jumpToDay() {
+    loadEntry(jumpDate);
+    setShowHistory(false);
+  }
+
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1>Dziennik</h1>
-          <div className="sub">Twój codzienny check-in</div>
+      <div className="j-topbar">
+        <div className="date-nav">
+          <button
+            className="icon-btn"
+            onClick={prevDay}
+            aria-label="Poprzedni dzień"
+          >
+            <Icon name="chevron-left" size={18} />
+          </button>
+          <div className="date-nav-mid">
+            <div className="date-nav-label">Wpis na</div>
+            <b>{formatPL(date)}</b>
+            {date !== today && (
+              <button className="date-nav-today" onClick={() => loadEntry(today)}>
+                Dziś
+              </button>
+            )}
+          </div>
+          <button
+            className={`icon-btn${date >= today ? " disabled" : ""}`}
+            onClick={nextDay}
+            aria-label="Następny dzień"
+          >
+            <Icon name="chevron-right" size={18} />
+          </button>
         </div>
-      </div>
-
-      <div className="date-nav">
         <button
-          className="icon-btn"
-          onClick={prevDay}
-          aria-label="Poprzedni dzień"
+          className="icon-btn j-hist-btn"
+          onClick={() => setShowHistory(true)}
+          aria-label="Zapisane wpisy"
         >
-          <Icon name="chevron-left" size={18} />
-        </button>
-        <div className="date-nav-mid">
-          <div className="date-nav-label">Wpis na</div>
-          <b>{formatPL(date)}</b>
-          {date !== today && (
-            <button className="date-nav-today" onClick={() => loadEntry(today)}>
-              Dziś
-            </button>
-          )}
-        </div>
-        <button
-          className={`icon-btn${date >= today ? " disabled" : ""}`}
-          onClick={nextDay}
-          aria-label="Następny dzień"
-        >
-          <Icon name="chevron-right" size={18} />
+          <Icon name="journal" size={19} />
         </button>
       </div>
 
       <form onSubmit={save}>
+        {pillLog && pillLog.needs_log && (
+          <div className="j-section">
+            <div className="j-sec-head">
+              <span className="js-ico">
+                <Icon name="pill" size={17} />
+              </span>
+              <b>Tabletka antykoncepcyjna</b>
+            </div>
+            {pillLog.taken ? (
+              <div className="pill-row">
+                <span className="pill-taken">
+                  Wzięta o {pillLog.taken_at}
+                  {pillLog.late ? " (spóźniona)" : ""}
+                </span>
+                <button type="button" className="btn small ghost" onClick={undoPill}>
+                  Cofnij
+                </button>
+              </div>
+            ) : (
+              <div className="pill-row">
+                <input
+                  type="time"
+                  className="pc-time"
+                  value={pillTimeInput}
+                  onChange={(e) => setPillTimeInput(e.target.value)}
+                />
+                <button type="button" className="btn small" onClick={logPill}>
+                  Wzięłam
+                </button>
+              </div>
+            )}
+            {pillLog.warning && <div className="pill-warn">{pillLog.warning}</div>}
+          </div>
+        )}
+
         <div className="j-section">
           <div className="j-sec-head">
             <span className="js-ico">
@@ -503,45 +577,74 @@ export default function JournalPage() {
         </div>
       </form>
 
-      <div className="section-head">
-        <h2>Zapisane wpisy</h2>
-      </div>
-      <div className="card" style={{ padding: "6px 18px" }}>
-        {entries.length === 0 && (
-          <p className="muted" style={{ padding: "12px 0" }}>
-            Brak zapisanych wpisów. Dodaj pierwszy powyżej!
-          </p>
-        )}
-        {entries.map((e) => {
-          const syms = (() => {
-            try {
-              return JSON.parse(e.symptoms || "[]");
-            } catch {
-              return [];
-            }
-          })();
-          return (
-            <div key={e.date} className="entry-row">
-              <div style={{ minWidth: 0 }}>
-                <div className="er-date">{formatPL(e.date)}</div>
-                <div className="er-sub">
-                  {moodEmojis(e.mood) || "brak nastroju"}
-                  {e.temperature ? ` · ${e.temperature}°C` : ""}
-                  {syms.length ? ` · ${syms.slice(0, 3).join(", ")}` : ""}
-                </div>
-              </div>
+      {showHistory && (
+        <div className="sheet-overlay" onClick={() => setShowHistory(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <b>Zapisane wpisy</b>
               <button
-                className="icon-btn er-edit"
-                style={{ width: 34, height: 34 }}
-                onClick={() => loadEntry(e.date)}
-                aria-label="Edytuj wpis"
+                className="icon-btn"
+                onClick={() => setShowHistory(false)}
+                aria-label="Zamknij"
               >
-                <Icon name="pen" size={15} />
+                <Icon name="x" size={18} />
               </button>
             </div>
-          );
-        })}
-      </div>
+            <label className="sheet-lbl">Przejdź do dnia</label>
+            <div className="jump-row">
+              <input
+                type="date"
+                className="sheet-input"
+                value={jumpDate}
+                max={today}
+                onChange={(e) => setJumpDate(e.target.value)}
+              />
+              <button className="btn small" onClick={jumpToDay}>
+                Pokaż
+              </button>
+            </div>
+            <div className="sheet-sub">Historia wpisów</div>
+            <div className="hist-list">
+              {entries.length === 0 && (
+                <p className="muted" style={{ padding: "10px 0" }}>
+                  Brak zapisanych wpisów.
+                </p>
+              )}
+              {entries.map((e) => {
+                const syms = (() => {
+                  try {
+                    return JSON.parse(e.symptoms || "[]");
+                  } catch {
+                    return [];
+                  }
+                })();
+                return (
+                  <div
+                    key={e.date}
+                    className="entry-row"
+                    onClick={() => {
+                      loadEntry(e.date);
+                      setShowHistory(false);
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div className="er-date">{formatPL(e.date)}</div>
+                      <div className="er-sub">
+                        {moodEmojis(e.mood) || "brak nastroju"}
+                        {e.temperature ? ` · ${e.temperature}°C` : ""}
+                        {syms.length ? ` · ${syms.slice(0, 3).join(", ")}` : ""}
+                      </div>
+                    </div>
+                    <span className="icon-btn er-edit" style={{ width: 34, height: 34 }}>
+                      <Icon name="pen" size={15} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

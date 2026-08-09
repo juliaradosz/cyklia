@@ -9,7 +9,7 @@ function Bars({ label, rows, fmt }) {
   return (
     <div className="mb">
       <div className="row">
-        <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>
       </div>
       {vals.map((r) => (
         <div key={r.label} className="mb">
@@ -80,13 +80,6 @@ export default function StatsPage() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1>Statystyki</h1>
-          <div className="sub">Podsumowanie Twojego cyklu i nawyków</div>
-        </div>
-      </div>
-
       <div className="stats-num-row">
         <Num
           value={stats.average_cycle !== null ? stats.average_cycle : "—"}
@@ -194,17 +187,12 @@ export default function StatsPage() {
       </div>
 
       <div className="stats-sec">
-        <h2>Sen i ruch a faza cyklu</h2>
+        <h2>Sen i ruch</h2>
         {stats.phases && stats.phases.length ? (
           <>
             <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-              Średnie w każdej fazie — zobaczysz, kiedy śpisz i ruszasz się
-              najwięcej.
+              Średnie w każdej fazie cyklu.
             </p>
-            <Bars
-              label="Średni sen (h)"
-              rows={stats.phases.map((p) => ({ label: p.phase, v: p.sleep }))}
-            />
             <Bars
               label="Średnie kroki"
               rows={stats.phases.map((p) => ({ label: p.phase, v: p.steps }))}
@@ -217,8 +205,29 @@ export default function StatsPage() {
           </>
         ) : (
           <p className="muted">
-            Zapisuj sen, kroki i aktywność w dzienniku, by zobaczyć, jak
+            Zapisuj kroki i aktywność w dzienniku, by zobaczyć, jak
             zmieniają się w trakcie cyklu.
+          </p>
+        )}
+      </div>
+
+      <div className="stats-sec">
+        <h2>Faza snu</h2>
+        {stats.phases && stats.phases.length ? (
+          <>
+            <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+              Średni sen w każdej fazie cyklu — zobaczysz, kiedy śpisz
+              najwięcej.
+            </p>
+            <Bars
+              label="Średni sen (h)"
+              rows={stats.phases.map((p) => ({ label: p.phase, v: p.sleep }))}
+            />
+          </>
+        ) : (
+          <p className="muted">
+            Zapisuj sen w dzienniku, by zobaczyć, jak zmienia się w trakcie
+            cyklu.
           </p>
         )}
       </div>
