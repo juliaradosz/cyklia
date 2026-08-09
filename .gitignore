@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 backend/cyklia.db
 backend/secret.key
+backend/groq_key.py
 
 # Node
 node_modules/

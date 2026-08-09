@@ -19,6 +19,20 @@ import urllib.request
 import json
 
 
+def _load_groq_config():
+    """Odczyt klucza AI: 1) zmienne środowiskowe, 2) lokalny plik groq_key.py (nie jest w Gicie)."""
+    api_url = os.environ.get("CYKLIA_LLM_API")
+    api_key = os.environ.get("CYKLIA_LLM_KEY")
+    model = os.environ.get("CYKLIA_LLM_MODEL")
+    if api_url and api_key:
+        return api_url, api_key, model or "llama-3.3-70b-versatile"
+    try:
+        import groq_key
+        return groq_key.GROQ_API_URL, groq_key.GROQ_API_KEY, groq_key.GROQ_MODEL
+    except ImportError:
+        return None, None, None
+
+
 def _pick(topics, user_message):
     msg = user_message.lower()
     return any(t in msg for t in topics)
@@ -400,6 +414,7 @@ def llm_reply(message, api_url, api_key, model, history, context=None):
         headers={
             "Content-Type": "application/json",
             "Authorization": "Bearer " + api_key,
+            "User-Agent": "Cyklia/1.0 (asystent zdrowia)",
         },
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -409,9 +424,7 @@ def llm_reply(message, api_url, api_key, model, history, context=None):
 
 def reply(message, history=None, context=None):
     history = history or []
-    api_url = os.environ.get("CYKLIA_LLM_API")
-    api_key = os.environ.get("CYKLIA_LLM_KEY")
-    model = os.environ.get("CYKLIA_LLM_MODEL", "meta-llama/llama-3.3-70b-instruct")
+    api_url, api_key, model = _load_groq_config()
     if api_url and api_key:
         try:
             return llm_reply(message, api_url, api_key, model, history, context)
