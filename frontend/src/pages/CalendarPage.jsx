@@ -305,12 +305,10 @@ export default function CalendarPage() {
                         aria-label={formatPL(c.iso)}
                       >
                         <span className="cnum">{c.day}</span>
-                        {(sexDays.has(c.iso) || (onPills && pillSet.has(c.iso))) && (
-                          <span className="cmark">
-                            {sexDays.has(c.iso) && <Icon name="heart" size={9} />}
-                            {onPills && pillSet.has(c.iso) && <Icon name="pill" size={9} />}
-                          </span>
-                        )}
+                        <span className="cmark">
+                          {sexDays.has(c.iso) && <Icon name="heart" size={9} />}
+                          {onPills && pillSet.has(c.iso) && <Icon name="pill" size={9} />}
+                        </span>
                       </button>
                     ) : (
                       <span key={i} className="cal-empty" />

@@ -1189,7 +1189,7 @@ select {
 .cal-sday {
   border: none;
   background: transparent;
-  aspect-ratio: 1;
+  height: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1228,7 +1228,7 @@ select {
   box-shadow: inset 0 0 0 2px #fff;
 }
 .cal-empty {
-  aspect-ratio: 1;
+  height: 48px;
 }
 .cmark {
   display: flex;
@@ -1236,6 +1236,7 @@ select {
   justify-content: center;
   gap: 2px;
   height: 10px;
+  min-height: 10px;
   color: var(--pink-600);
 }
 .cmark svg {
