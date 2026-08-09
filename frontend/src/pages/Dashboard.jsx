@@ -1,38 +1,68 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useCalendar, addPeriod } from "../hooks.js";
+import { useCalendar, addPeriod, removePeriod } from "../hooks.js";
 import {
   todayISO,
   daysBetween,
   addDays,
-  shortPL,
-  formatPL,
+  dayMonthPL,
+  weekOf,
+  WEEK_LETTERS,
   nowHM,
-  MOODS,
 } from "../utils.js";
 import { api } from "../api/client.js";
 import { useEffect, useState } from "react";
 import Icon from "../components/Icon.jsx";
+
+const SEX_ACT = [
+  "Dzień bez seksu",
+  "Seks z zabezpieczeniem",
+  "Seks bez zabezpieczenia",
+  "Seks oralny",
+  "Seks analny",
+  "Masturbacja",
+  "Pieszczoty",
+  "Gadżety erotyczne",
+  "Orgazm",
+];
+
+const LIBIDO_ACT = ["Wysokie libido", "Średnie libido", "Niskie libido"];
 
 export default function Dashboard() {
   const { data, reload } = useCalendar();
   const navigate = useNavigate();
   const [entry, setEntry] = useState(null);
   const [cycles, setCycles] = useState([]);
+  const [inspos, setInspos] = useState([]);
   const [pillLog, setPillLog] = useState(null);
   const [pillTimeInput, setPillTimeInput] = useState(nowHM());
+  const [sheet, setSheet] = useState(null);
+  const [sexSel, setSexSel] = useState([]);
+  const [libidoSel, setLibidoSel] = useState("");
+  const [periodId, setPeriodId] = useState(null);
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
   const today = todayISO();
 
   useEffect(() => {
     (async () => {
       try {
-        const [e, c, pl] = await Promise.all([
+        const [e, c, ins, pl] = await Promise.all([
           api(`/entries/${today}`).catch(() => null),
-          api("/cycles"),
+          api("/cycles").catch(() => []),
+          api("/inspirations").catch(() => []),
           api("/pills/log").catch(() => null),
         ]);
         setEntry(e);
         setCycles(c || []);
+        setInspos(ins || []);
         setPillLog(pl);
+        try {
+          const sex = e?.sex ? JSON.parse(e.sex) : [];
+          setSexSel(SEX_ACT.filter((a) => sex.includes(a)));
+          setLibidoSel(LIBIDO_ACT.find((l) => sex.includes(l)) || "");
+        } catch {
+          /* ignore */
+        }
       } catch {
         /* ignore */
       }
@@ -49,298 +79,114 @@ export default function Dashboard() {
     (c) => c.start_date <= today && (!c.end_date || c.end_date >= today)
   );
 
-  let periodDay = null;
-  let periodEnd = null;
-  if (currentPeriod) {
-    periodDay = daysBetween(currentPeriod.start_date, today) + 1;
-    periodEnd =
-      currentPeriod.end_date || addDays(currentPeriod.start_date, 4);
-  }
-
-  let countdown = null;
-  if (pred.next_period_start) {
-    countdown = daysBetween(today, pred.next_period_start);
-  }
-
-  let cycleDay = null;
-  const lastStart = cycles.length
-    ? [...cycles].sort((a, b) => a.start_date.localeCompare(b.start_date))[
-        cycles.length - 1
-      ].start_date
-    : null;
-  if (lastStart && lastStart <= today) {
-    cycleDay = daysBetween(lastStart, today) + 1;
-  }
-
-  const fertileToday =
-    !onPills &&
-    pred.has_data &&
-    today >= pred.fertile_start &&
-    today <= pred.fertile_end;
-  const ovulationToday = !onPills && pred.has_data && pred.ovulation_date === today;
-
-  const moodToday = entry?.mood ? MOODS.find((m) => m.key === entry.mood) : null;
-  const symptomList = (() => {
-    try {
-      return entry?.symptoms ? JSON.parse(entry.symptoms) : [];
-    } catch {
-      return [];
-    }
-  })();
-
-  let phaseChip = "Dzień cyklu";
-  if (todayType === "period") phaseChip = "Okres";
-  else if (onPills) phaseChip = "Tabletki";
-  else if (todayType === "ovulation") phaseChip = "Owulacja";
-  else if (todayType === "fertile") phaseChip = "Dni płodne";
-
-  let heroBig, heroSub, heroNote;
-  if (periodDay) {
-    heroBig = (
-      <>
-        Dzień {periodDay}
-        <small>.</small>
-      </>
-    );
-    heroSub = "okresu";
-    heroNote = `Koniec ok. ${shortPL(periodEnd)}`;
-  } else if (cycleDay) {
-    heroBig = (
-      <>
-        Dzień {cycleDay}
-        <small>.</small>
-      </>
-    );
-    heroSub = "cyklu";
-    heroNote =
-      countdown !== null
-        ? countdown > 0
-          ? `${countdown} dni do okresu`
-          : countdown === 0
-          ? "okres — dziś!"
-          : `${-countdown} dni po terminie`
-        : onPills
-        ? "Cykl w trybie tabletek"
-        : "";
-  } else {
-    heroBig = (
-      <>
-        —
-      </>
-    );
-    heroSub = "zacznij śledzenie";
-    heroNote = "Dodaj pierwszy okres w kalendarzu, by zobaczyć prognozy";
-  }
-
-  const stats = [
-    {
-      n: `${pred.cycle_length}`,
-      l: "dni cyklu",
-    },
-    onPills
-      ? {
-          n: countdown !== null ? `${Math.max(countdown, 0)}` : "—",
-          l:
-            countdown !== null && countdown <= 0
-              ? "okres — dziś"
-              : "dni do okresu",
-        }
-      : {
-          n: pred.ovulation_date ? shortPL(pred.ovulation_date) : "—",
-          l: "owulacja",
-        },
-    {
-      n: onPills ? "—" : countdown !== null ? `${Math.max(countdown, 0)}` : "—",
-      l: onPills ? "bez owulacji" : "dni do okresu",
-    },
-  ];
-
-  return (
-    <div>
-      <div className="hero">
-        <div className="hero-top">
-          <span className="hero-date">Dziś · {formatPL(today)}</span>
-          <span className="hero-chip">{phaseChip}</span>
-        </div>
-        <div className="hero-big">{heroBig}</div>
-        <div className="hero-sub">{heroSub}</div>
-        {heroNote && <div className="hero-note">{heroNote}</div>}
-        <div className="hero-stats">
-          {stats.map((s, i) => (
-            <div key={i} className="hero-stat">
-              <div className="n">{s.n}</div>
-              <div className="l">{s.l}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {onPills && pillLog && pillLog.needs_log && (
-        <div className="pill-card">
-          <div className="pc-head">
-            <span className="pc-ico">
-              <Icon name="pill" size={20} />
-            </span>
-            <div className="pc-hd">
-              <b>Tabletka dzisiaj</b>
-              <span className="pc-sub">Zwykła pora: {pillLog.expected_time}</span>
-            </div>
-          </div>
-          {pillLog.taken ? (
-            <>
-              <div className={`pc-status ${pillLog.late ? "late" : "ok"}`}>
-                <Icon name={pillLog.late ? "zap" : "check"} size={16} />
-                {pillLog.late
-                  ? `Wzięta spóźniona o ${pillLog.taken_at}`
-                  : `Wzięta o ${pillLog.taken_at}`}
-              </div>
-              {pillLog.warning && (
-                <div className="pc-warn">
-                  <Icon name="info" size={15} />
-                  <span>{pillLog.warning}</span>
-                </div>
-              )}
-              <div className="pc-actions">
-                <button className="pc-undo" onClick={undoPill}>
-                  Cofnij
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="pc-log">
-              <input
-                type="time"
-                className="pc-time"
-                value={pillTimeInput}
-                onChange={(e) => setPillTimeInput(e.target.value)}
-              />
-              <button className="btn small" onClick={logPill}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-                  <Icon name="check" size={15} /> Wzięłam tabletkę
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {onPills && (!pillLog || !pillLog.needs_log) && (
-        <div className="info-banner">
-          <span className="ib-ico">
-            <Icon name="pill" size={18} />
-          </span>
-          <div className="ib-text">
-            {pillLog && pillLog.day_type === "period" ? (
-              <>
-                <b>Przerwa od tabletek</b> — w trakcie przerwy nie przyjmujesz
-                tabletki. Kolejny blister zacznij po jej zakończeniu.
-              </>
-            ) : (
-              <>
-                <b>Tryb tabletek</b> — brak owulacji i dni płodnych. Kolejny
-                okres przewidywany w przerwie między blistrami.
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="quick-actions">
-        <button className="qa" onClick={() => navigate("/dziennik")}>
-          <span className="qa-ico">
-            <Icon name="pen" size={22} />
-          </span>
-          <span className="qa-lbl">Dodaj wpis</span>
-        </button>
-        <button className="qa" onClick={() => navigate("/dziennik")}>
-          <span className="qa-ico">
-            <Icon name="heart" size={22} />
-          </span>
-          <span className="qa-lbl">Objawy</span>
-        </button>
-        <button className="qa" onClick={() => navigate("/kalendarz")}>
-          <span className="qa-ico">
-            <Icon name="calendar" size={22} />
-          </span>
-          <span className="qa-lbl">Kalendarz</span>
-        </button>
-      </div>
-
-      {(ovulationToday || fertileToday || todayType === "period") && (
-        <div className="spread mb" style={{ marginTop: 4 }}>
-          {todayType === "period" && (
-            <span className="status-pill pink">
-              <span className="dot" /> Okres
-            </span>
-          )}
-          {ovulationToday && (
-            <span className="status-pill mauve">
-              <span className="dot" /> Owulacja — dziś!
-            </span>
-          )}
-          {fertileToday && !ovulationToday && (
-            <span className="status-pill green">
-              <span className="dot" /> Jesteś w oknie płodnym
-            </span>
-          )}
-        </div>
-      )}
-
-      <div className="section-head">
-        <h2>Dzisiejszy wpis</h2>
-        {entry && (
-          <Link to="/dziennik" className="more">
-            Edytuj
-          </Link>
-        )}
-      </div>
-
-      <div className="today-entry">
-        <div className="te-mood">{moodToday ? moodToday.emoji : "🌱"}</div>
-        <div className="te-body">
-          <div className="te-title">
-            {entry
-              ? moodToday
-                ? `Nastrój: ${moodToday.label}`
-                : "Wpis zapisany"
-              : "Brak wpisu na dziś"}
-          </div>
-          <div className="te-sub">
-            {entry
-              ? [
-                  entry.temperature ? `${entry.temperature}°C` : null,
-                  entry.sleep ? `Sen ${entry.sleep} h` : null,
-                  entry.steps ? `${entry.steps} kroków` : null,
-                ]
-                  .filter(Boolean)
-                  .concat(symptomList.slice(0, 2))
-                  .join(" · ") || "Dodaj szczegóły dnia"
-              : "Zapisz nastrój, objawy i temperaturę w dzienniku"}
-          </div>
-        </div>
-        <button
-          className="te-cta"
-          onClick={() => navigate("/dziennik")}
-          aria-label="Przejdź do dziennika"
-        >
-          <Icon name="chevron-right" size={20} />
-        </button>
-      </div>
-
-      {!currentPeriod && (
-        <button className="btn ghost block" onClick={logPeriodToday}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Icon name="calendar" size={17} /> Zaznacz początek okresu
-          </span>
-        </button>
-      )}
-    </div>
+  const sortedStarts = [...cycles].sort((a, b) =>
+    a.start_date.localeCompare(b.start_date)
   );
+  const lastStart = sortedStarts.length ? sortedStarts[sortedStarts.length - 1].start_date : null;
+  const periodDay = currentPeriod
+    ? daysBetween(currentPeriod.start_date, today) + 1
+    : null;
+  const cycleDay = lastStart && lastStart <= today
+    ? daysBetween(lastStart, today) + 1
+    : null;
 
-  async function logPeriodToday() {
-    if (currentPeriod) return;
-    await addPeriod(today, undefined, 1);
-    reload();
+  let cycleLen = pred.cycle_length;
+  if (sortedStarts.length >= 2) {
+    const a = sortedStarts[sortedStarts.length - 2].start_date;
+    const b = sortedStarts[sortedStarts.length - 1].start_date;
+    const diff = daysBetween(a, b);
+    if (diff > 0) cycleLen = diff;
+  }
+
+  const countdown = pred.next_period_start
+    ? daysBetween(today, pred.next_period_start)
+    : null;
+
+  let phaseLabel = "Śledzenie";
+  if (todayType === "period") phaseLabel = "Okres";
+  else if (todayType === "ovulation") phaseLabel = "Owulacja";
+  else if (todayType === "fertile") phaseLabel = "Dni płodne";
+  else if (onPills) phaseLabel = "Aktywne dni";
+  else if (cycleDay && pred.cycle_length) {
+    phaseLabel =
+      cycleDay < pred.cycle_length - 14 ? "Faza folikularna" : "Faza lutealna";
+  }
+
+  const dayLine = periodDay
+    ? `Dzień ${periodDay}`
+    : cycleDay
+    ? `Dzień ${cycleDay} cyklu`
+    : "Zacznij śledzenie";
+  const noteLine = periodDay
+    ? `Cykl trwał ${cycleLen} dni`
+    : countdown !== null
+    ? countdown > 0
+      ? `${countdown} dni do okresu`
+      : countdown === 0
+      ? "okres — dziś!"
+      : `${-countdown} dni po terminie`
+    : onPills
+    ? "Kolejna przerwa wg kalendarza"
+    : "Dodaj okres w kalendarzu";
+
+  const week = weekOf(today);
+
+  function openSex() {
+    setSheet("sex");
+  }
+
+  function openPeriod() {
+    if (!currentPeriod) return;
+    setPeriodId(currentPeriod.id);
+    setPeriodStart(currentPeriod.start_date);
+    setPeriodEnd(currentPeriod.end_date || "");
+    setSheet("period");
+  }
+
+  function toggleSex(a) {
+    setSexSel((prev) =>
+      prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
+    );
+  }
+
+  async function saveSex() {
+    try {
+      const items = [...sexSel];
+      const lib = libidoSel ? libidoSel.split(" ")[0] : null;
+      if (lib) items.push(libidoSel);
+      await api(`/entries/${today}`, {
+        method: "PUT",
+        body: { sex: items, libido: lib },
+      });
+      const e = await api(`/entries/${today}`).catch(() => null);
+      setEntry(e);
+      setSheet(null);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function savePeriod() {
+    try {
+      await api(`/cycles/${periodId}`, {
+        method: "PATCH",
+        body: { start_date: periodStart, end_date: periodEnd || null },
+      });
+      setSheet(null);
+      reload();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function deletePeriod() {
+    try {
+      await removePeriod(periodId);
+      setSheet(null);
+      reload();
+    } catch {
+      /* ignore */
+    }
   }
 
   async function logPill() {
@@ -364,4 +210,209 @@ export default function Dashboard() {
       /* ignore */
     }
   }
+
+  return (
+    <div className="dash">
+      <div className="dash-hero">
+        <div className="dash-top">
+          <div className="dash-date">{dayMonthPL(today)}</div>
+          <button
+            className="dash-cal"
+            onClick={() => navigate("/kalendarz")}
+            aria-label="Kalendarz"
+          >
+            <Icon name="calendar" size={20} />
+          </button>
+        </div>
+        <div className="week-row">
+          {week.map((d, i) => {
+            const isPeriodDay = data.days[d] === "period";
+            const isToday = d === today;
+            const num = Number(d.slice(8, 10));
+            return (
+              <div key={d} className={`week-day${isToday ? " today" : ""}`}>
+                <span className="wd-letter">{WEEK_LETTERS[i]}</span>
+                <span className={`wd-num${isPeriodDay ? " period" : ""}`}>
+                  {num}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="dash-status">
+        <div className="ds-left">
+          <div className="ds-phase">{phaseLabel}</div>
+          <div className="ds-day">{dayLine}</div>
+          <div className="ds-note">{noteLine}</div>
+        </div>
+        <div className="ds-bubbles">
+          <button className="ds-bubble" onClick={openPeriod}>
+            <span className="ds-b-ico">
+              <Icon name="calendar" size={18} />
+            </span>
+            Edytuj okres
+          </button>
+          <button className="ds-bubble" onClick={() => navigate("/dziennik")}>
+            <span className="ds-b-ico">
+              <Icon name="heart" size={18} />
+            </span>
+            Objawy
+          </button>
+          <button className="ds-bubble" onClick={openSex}>
+            <span className="ds-b-ico">
+              <Icon name="heart" size={18} />
+            </span>
+            Stosunek
+          </button>
+        </div>
+      </div>
+
+      {onPills && pillLog && pillLog.needs_log && (
+        <div className="dash-pill">
+          <div className="dp-ico">
+            <Icon name="pill" size={18} />
+          </div>
+          {pillLog.taken ? (
+            <div className="dp-body">
+              <b>
+                {pillLog.late ? "Wzięta spóźniona" : "Wzięta"} o {pillLog.taken_at}
+              </b>
+              <span className="dp-sub">{pillLog.warning || "Tabletka zalogowana"}</span>
+              <button className="dp-undo" onClick={undoPill}>
+                Cofnij
+              </button>
+            </div>
+          ) : (
+            <div className="dp-body">
+              <b>Tabletka dzisiaj</b>
+              <span className="dp-sub">Zwykła pora: {pillLog.expected_time}</span>
+              <div className="dp-log">
+                <input
+                  type="time"
+                  className="pc-time"
+                  value={pillTimeInput}
+                  onChange={(e) => setPillTimeInput(e.target.value)}
+                />
+                <button className="btn small" onClick={logPill}>
+                  Wzięłam
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="section-head">
+        <h2>Moje codzienne inspiracje</h2>
+      </div>
+      <div className="inspo-list">
+        {inspos.length === 0 && (
+          <p className="muted" style={{ fontSize: 13, padding: "6px 2px" }}>
+            Dodaj pierwszy okres, by zobaczyć dopasowane inspiracje.
+          </p>
+        )}
+        {inspos.map((a) => (
+          <Link key={a.id} to={`/inspiracje/${a.id}`} className="inspo-card">
+            <div className="inspo-txt">
+              <span className="inspo-badge">{a.badge || a.category}</span>
+              <b>{a.title}</b>
+              <span className="inspo-sum">{a.summary}</span>
+            </div>
+            <span className="inspo-arrow">
+              <Icon name="chevron-right" size={18} />
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      {!currentPeriod && (
+        <button
+          className="btn ghost block mt"
+          onClick={async () => {
+            await addPeriod(today, undefined, 1);
+            reload();
+          }}
+        >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Icon name="calendar" size={17} /> Zaznacz początek okresu
+          </span>
+        </button>
+      )}
+
+      {sheet === "sex" && (
+        <div className="sheet-overlay" onClick={() => setSheet(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <b>Seks i libido</b>
+              <button className="icon-btn" onClick={() => setSheet(null)} aria-label="Zamknij">
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <div className="sheet-sub">Aktywność seksualna</div>
+            <div className="sex-grid">
+              {SEX_ACT.map((a) => (
+                <button
+                  key={a}
+                  className={`sex-chip${sexSel.includes(a) ? " on" : ""}`}
+                  onClick={() => toggleSex(a)}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            <div className="sheet-sub">Libido</div>
+            <div className="sex-grid">
+              {LIBIDO_ACT.map((l) => (
+                <button
+                  key={l}
+                  className={`sex-chip${libidoSel === l ? " on" : ""}`}
+                  onClick={() => setLibidoSel(libidoSel === l ? "" : l)}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+            <button className="btn block mt" onClick={saveSex}>
+              Zapisz
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sheet === "period" && currentPeriod && (
+        <div className="sheet-overlay" onClick={() => setSheet(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-head">
+              <b>Edytuj okres</b>
+              <button className="icon-btn" onClick={() => setSheet(null)} aria-label="Zamknij">
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <label className="sheet-lbl">Początek</label>
+            <input
+              type="date"
+              className="sheet-input"
+              value={periodStart}
+              onChange={(e) => setPeriodStart(e.target.value)}
+            />
+            <label className="sheet-lbl">Koniec (opcjonalnie)</label>
+            <input
+              type="date"
+              className="sheet-input"
+              value={periodEnd}
+              onChange={(e) => setPeriodEnd(e.target.value)}
+            />
+            <button className="btn block mt" onClick={savePeriod}>
+              Zapisz zmiany
+            </button>
+            <button className="btn ghost block danger mt" onClick={deletePeriod}>
+              Usuń ten okres
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

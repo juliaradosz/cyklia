@@ -2482,3 +2482,336 @@ select {
   color: var(--pink-700);
   font-weight: 700;
 }
+
+/* ---------- Dashboard "jedno okienko" ---------- */
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dash-hero {
+  position: relative;
+  border-radius: 26px;
+  overflow: hidden;
+  padding: 16px 18px 18px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 250, 252, 0.72) 0%,
+      rgba(255, 238, 246, 0.55) 100%
+    ),
+    url("/background.jpg") center / cover no-repeat;
+  box-shadow: 0 10px 30px rgba(94, 38, 66, 0.12);
+}
+
+.dash-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.dash-date {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--ink);
+}
+.dash-cal {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 1px solid rgba(231, 201, 216, 0.8);
+  background: rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--pink-600);
+}
+
+.week-row {
+  display: flex;
+  justify-content: space-between;
+}
+.week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.wd-letter {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-3);
+  text-transform: lowercase;
+}
+.week-day.today .wd-letter {
+  color: var(--pink-600);
+}
+.wd-num {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.wd-num.period {
+  background: var(--pink-100);
+  box-shadow: inset 0 0 0 2px var(--pink-300);
+  color: var(--pink-700);
+  font-weight: 800;
+}
+.week-day.today .wd-num {
+  background: var(--pink-600);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(201, 58, 110, 0.35);
+}
+.week-day.today .wd-num.period {
+  background: var(--pink-600);
+  color: #fff;
+  box-shadow: inset 0 0 0 2px #fff, 0 6px 16px rgba(201, 58, 110, 0.35);
+}
+
+.dash-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ds-left {
+  min-width: 0;
+}
+.ds-phase {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--ink);
+  text-transform: capitalize;
+}
+.ds-day {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--pink-600);
+  margin-top: 2px;
+}
+.ds-note {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.ds-bubbles {
+  display: flex;
+  gap: 8px;
+}
+.ds-bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  min-width: 74px;
+}
+.ds-b-ico {
+  width: 38px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--pink-100);
+  color: var(--pink-600);
+}
+
+.dash-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 12px 14px;
+}
+.dp-ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--pink-100);
+  color: var(--pink-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dp-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13.5px;
+}
+.dp-sub {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.dp-log {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.dp-undo {
+  align-self: flex-start;
+  margin-top: 4px;
+  border: none;
+  background: none;
+  color: var(--pink-600);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+}
+
+.inspo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inspo-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  padding: 13px 14px;
+  text-decoration: none;
+  color: inherit;
+  transition: 0.15s ease;
+}
+.inspo-card:active {
+  background: var(--surface-2);
+}
+.inspo-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.inspo-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--pink-600);
+}
+.inspo-txt b {
+  font-size: 14px;
+  line-height: 1.25;
+}
+.inspo-sum {
+  font-size: 12px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.inspo-arrow {
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(48, 22, 36, 0.45);
+  backdrop-filter: blur(3px);
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sheet {
+  width: 100%;
+  max-width: 520px;
+  background: var(--surface);
+  border-radius: 26px 26px 0 0;
+  padding: 18px 20px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px rgba(48, 22, 36, 0.22);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.sheet-head b {
+  font-size: 18px;
+  font-weight: 800;
+}
+.sheet-sub {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-2);
+  margin: 12px 0 8px;
+}
+.sheet-lbl {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin: 10px 0 6px;
+}
+.sheet-input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 12px 13px;
+  font-size: 14px;
+  outline: none;
+}
+.sex-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sex-chip {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 9px 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  transition: 0.15s ease;
+}
+.sex-chip.on {
+  border-color: transparent;
+  background: var(--pink-600);
+  color: #fff;
+  font-weight: 700;
+}
+.btn.ghost.danger {
+  color: #c0392b;
+  border-color: rgba(192, 57, 43, 0.35);
+}
+

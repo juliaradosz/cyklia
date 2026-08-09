@@ -190,6 +190,35 @@ def create_app():
         db.execute("DELETE FROM cycles WHERE id = ? AND user_id = ?", (cid, user_id))
         return jsonify({"ok": True})
 
+    @app.patch("/api/cycles/<int:cid>")
+    @auth.auth_required
+    def update_cycle(user_id, cid):
+        row = db.query_one(
+            "SELECT * FROM cycles WHERE id = ? AND user_id = ?", (cid, user_id)
+        )
+        if not row:
+            return jsonify({"error": "Nie znaleziono okresu"}), 404
+        data = request.get_json(silent=True) or {}
+        fields, args = [], []
+        for key in ("start_date", "end_date"):
+            if key in data:
+                val = (data[key] or "").strip() or None
+                if val is not None:
+                    try:
+                        datetime.strptime(val, "%Y-%m-%d")
+                    except ValueError:
+                        return jsonify({"error": "Nieprawidłowa data"}), 400
+                fields.append(f"{key} = ?")
+                args.append(val)
+        if "flow_level" in data:
+            fields.append("flow_level = ?")
+            args.append(int(data["flow_level"]) if data["flow_level"] is not None else 1)
+        if not fields:
+            return jsonify(row)
+        args.append(cid)
+        db.execute(f"UPDATE cycles SET {', '.join(fields)} WHERE id = ? AND user_id = ?", tuple(args + [user_id]))
+        return jsonify(db.query_one("SELECT * FROM cycles WHERE id = ?", (cid,)))
+
     # ---------- Dziennik (wpisy dzienne) ----------
 
     @app.get("/api/entries")
@@ -245,30 +274,31 @@ def create_app():
             "weight": data.get("weight"),
             "steps": data.get("steps"),
             "sleep_quality": data.get("sleep_quality"),
+            "sex": _to_json_list(data.get("sex")) if data.get("sex") is not None else None,
         }
         if existing:
             db.execute(
                 "UPDATE entries SET temperature=?, mood=?, symptoms=?, notes=?, "
                 "water=?, sleep=?, activity=?, libido=?, stress=?, mucus=?, weight=?, "
-                "steps=?, sleep_quality=? "
+                "steps=?, sleep_quality=?, sex=? "
                 "WHERE id=?",
                 (
                     vals["temperature"], vals["mood"], vals["symptoms"], vals["notes"],
                     vals["water"], vals["sleep"], vals["activity"], vals["libido"],
                     vals["stress"], vals["mucus"], vals["weight"], vals["steps"],
-                    vals["sleep_quality"], existing["id"],
+                    vals["sleep_quality"], vals["sex"], existing["id"],
                 ),
             )
         else:
             db.execute(
                 "INSERT INTO entries (user_id, date, temperature, mood, symptoms, notes, "
-                "water, sleep, activity, libido, stress, mucus, weight, steps, sleep_quality) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "water, sleep, activity, libido, stress, mucus, weight, steps, sleep_quality, sex) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     user_id, day, vals["temperature"], vals["mood"], vals["symptoms"],
                     vals["notes"], vals["water"], vals["sleep"], vals["activity"],
                     vals["libido"], vals["stress"], vals["mucus"], vals["weight"],
-                    vals["steps"], vals["sleep_quality"],
+                    vals["steps"], vals["sleep_quality"], vals["sex"],
                 ),
             )
         return jsonify(db.query_one("SELECT * FROM entries WHERE user_id = ? AND date = ?", (user_id, day)))
@@ -414,6 +444,52 @@ def create_app():
         })
 
     # ---------- Artykuły (sekcja Inspiracje) ----------
+
+    @app.get("/api/inspirations")
+    @auth.auth_required
+    def daily_inspirations(user_id):
+        today = date.today().isoformat()
+        cycles = db.query(
+            "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
+        )
+        user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+        starts = [c["start_date"] for c in cycles]
+        pred = cyc.build_calendar(
+            starts,
+            cycle_length=user["cycle_length_default"],
+            period_length=user["period_length_default"],
+            pills=bool(user["pill_mode"]),
+            pill_cycle=user["pill_cycle_days"] or 21,
+            pill_break=(user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+        )
+        target = "any"
+        if (
+            not pred.get("on_pills")
+            and pred.get("has_data")
+            and pred.get("fertile_start")
+            and pred.get("fertile_end")
+            and pred["fertile_start"] <= today <= pred["fertile_end"]
+        ):
+            target = "ovulation"
+        else:
+            ph = _entry_phase(
+                today, pred, starts, period_length=user["period_length_default"]
+            )
+            target = {
+                "Okres": "period",
+                "Przerwa": "period",
+                "Faza lutealna": "luteal",
+            }.get(ph, "any")
+        rows = db.query(
+            "SELECT id, slug, title, category, summary, badge, tone, illustration, phase "
+            "FROM articles ORDER BY id"
+        )
+        saved = _saved_ids(user_id)
+        matched = [r for r in rows if r["phase"] == target]
+        matched_ids = {r["id"] for r in matched}
+        fallback = [r for r in rows if r["phase"] == "any" and r["id"] not in matched_ids]
+        picks = (matched + fallback)[:4]
+        return jsonify([dict(r, saved=r["id"] in saved) for r in picks])
 
     @app.get("/api/articles")
     def list_articles():

@@ -57,6 +57,31 @@ export function shortPL(s) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
+export function dayMonthPL(s) {
+  const d = parseISO(s);
+  const months = [
+    "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+    "lipca", "sierpnia", "września", "października", "listopada", "grudnia",
+  ];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+export function weekOf(s) {
+  const d = parseISO(s);
+  const dow = (d.getDay() + 6) % 7;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - dow);
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const dd = new Date(monday);
+    dd.setDate(monday.getDate() + i);
+    out.push(iso(dd));
+  }
+  return out;
+}
+
+export const WEEK_LETTERS = ["p", "w", "ś", "c", "p", "s", "n"];
+
 export const MOODS = [
   { key: "radosna", emoji: "😊", label: "Radosna" },
   { key: "spokojna", emoji: "😌", label: "Spokojna" },
