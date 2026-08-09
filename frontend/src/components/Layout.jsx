@@ -14,6 +14,7 @@ export default function Layout() {
   const { pathname } = useLocation();
   return (
     <>
+      <div className="app-bg" />
       <main className={`page${pathname === "/" ? " page--flush" : ""}`}>
         <Outlet />
       </main>

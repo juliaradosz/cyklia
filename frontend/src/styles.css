@@ -126,6 +126,8 @@ textarea {
 
 /* ---------- Rozkład strony ---------- */
 .page {
+  position: relative;
+  z-index: 1;
   padding: calc(14px + env(safe-area-inset-top)) 20px calc(116px + env(safe-area-inset-bottom));
 }
 .page-header {
@@ -3254,11 +3256,10 @@ select {
 }
 
 /* ---------- Szklo: wspolne tlo i karty ---------- */
-.page::before {
-  content: "";
+.app-bg {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   background-color: #fbeef4;
   background-image:
@@ -3274,7 +3275,7 @@ select {
   background-size: cover;
 }
 @media (min-width: 520px) {
-  .page::before {
+  .app-bg {
     background-size: contain;
   }
 }
