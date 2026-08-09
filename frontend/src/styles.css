@@ -1685,7 +1685,7 @@ select {
   bottom: calc(92px + env(safe-area-inset-bottom));
   z-index: 30;
   padding: 10px 0;
-  background: linear-gradient(to top, var(--bg) 72%, transparent);
+  background: linear-gradient(to top, rgba(255, 250, 252, 0.78) 72%, transparent);
 }
 .j-saved-note {
   text-align: center;
@@ -2923,34 +2923,6 @@ select {
   padding: calc(8px + env(safe-area-inset-top)) 20px 12px;
 }
 
-.dash-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-color: #fbeef4;
-  background-image:
-    linear-gradient(
-      180deg,
-      rgba(255, 250, 252, 0.5) 0%,
-      rgba(255, 238, 246, 0.35) 100%
-    ),
-    url("/background.jpg");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: cover;
-}
-/* na szerokich ekranach (desktop) tlo nie rozciaga sie - caly pionowy obrazek widoczny */
-@media (min-width: 520px) {
-  .dash-bg {
-    background-size: contain;
-  }
-}
-.dash > :not(.dash-bg) {
-  position: relative;
-  z-index: 1;
-}
-
 .dash-hero {
   position: relative;
   padding: 6px 4px 0;
@@ -3279,5 +3251,97 @@ select {
 .btn.ghost.danger {
   color: #c0392b;
   border-color: rgba(192, 57, 43, 0.35);
+}
+
+/* ---------- Szklo: wspolne tlo i karty ---------- */
+.page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: #fbeef4;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(255, 250, 252, 0.82) 0%,
+      rgba(255, 244, 249, 0.66) 45%,
+      rgba(255, 240, 247, 0.52) 100%
+    ),
+    url("/background.jpg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+@media (min-width: 520px) {
+  .page::before {
+    background-size: contain;
+  }
+}
+
+.card,
+.j-section,
+.settings-group,
+.search-input,
+.welcome-card,
+.sug-card,
+.chat-list-card,
+.bubble.bot,
+.chat-input,
+.sheet,
+.modal,
+.insp-box,
+.date-nav,
+.dash-cal,
+.dash-pill,
+.ds-b-ico,
+.cat-nav-btn {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 10px 30px rgba(94, 38, 66, 0.14);
+}
+
+.for-you,
+.cat-hero {
+  background: linear-gradient(135deg, rgba(255, 225, 238, 0.55), rgba(243, 199, 221, 0.45));
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.mood-opt,
+.symptom-chip,
+.cat-chip,
+.sex-chip,
+.chip,
+.symptom-pill,
+.mood-btn,
+.st-btn {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.field input,
+.field select,
+.field textarea,
+.vital-field select,
+.vital-field input,
+.sheet-input {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.bottom-nav {
+  background: rgba(255, 255, 255, 0.7);
 }
 
