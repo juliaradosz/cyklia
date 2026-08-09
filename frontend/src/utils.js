@@ -132,11 +132,81 @@ export const SYMPTOMS = [
 
 export const LIBIDO = ["Niskie", "Średnie", "Wysokie"];
 
-export const MUCUS = [
-  "Brak / sucho",
-  "Kleisty",
-  "Kremowy",
-  "Wodnisty",
-  "Białko jajka",
-  "Krwisty",
+export const BLEEDING = ["Skąpe", "Średnio obfite", "Skrzepy"];
+
+export const DIGESTIVE = ["Mdłości", "Wzdęcia", "Zaparcia", "Biegunka"];
+
+export const SEX_ACT = [
+  "Dzień bez seksu",
+  "Seks z zabezpieczeniem",
+  "Seks bez zabezpieczenia",
+  "Seks oralny",
+  "Seks analny",
+  "Masturbacja",
+  "Pieszczoty",
+  "Gadżety erotyczne",
+  "Orgazm",
 ];
+
+export const MUCUS = [
+  "Brak",
+  "Kremowa",
+  "Wodnista",
+  "Lepka",
+  "Jak białko jajka",
+  "Plamienia",
+  "Nietypowa",
+  "Biała i grudkowata",
+  "Szara",
+];
+
+export const PHASE_HINTS = {
+  period: {
+    icon: "droplet",
+    title: "Okres",
+    text: "To naturalna część cyklu. Organizm może być zmęczony — daj sobie więcej odpoczynku i ciepła.",
+    items: ["Ból brzucha", "Zmęczenie", "Wahania nastroju", "Wzdęcia", "Ból piersi"],
+  },
+  follicular: {
+    icon: "flower",
+    title: "Faza folikularna",
+    text: "Po okresie energia wraca — dobry czas na działanie, sport i nowe plany.",
+    items: ["Wzrost energii", "Lepsze samopoczucie", "Jaśniejsza skóra"],
+  },
+  ovulation: {
+    icon: "sparkles",
+    title: "Owulacja",
+    text: "Płodność jest najwyższa — możesz zauważyć wzrost libido i śluz jak białko jajka.",
+    items: ["Wzrost libido", "Śluz jak białko jajka", "Lekki ból jajnika"],
+  },
+  fertile: {
+    icon: "sparkles",
+    title: "Dni płodne",
+    text: "Zbliżasz się do owulacji — jeśli nie planujesz ciąży, pamiętaj o ochronie.",
+    items: ["Więcej śluzu", "Wzrost energii"],
+  },
+  luteal: {
+    icon: "moon",
+    title: "Faza lutealna",
+    text: "Po owulacji możesz odczuwać objawy PMS — to normalne przed okresem.",
+    items: ["Drażliwość", "Wzdęcia", "Ból piersi", "Zachcianki na słodkie", "Zmęczenie"],
+  },
+  pills_active: {
+    icon: "pill",
+    title: "Aktywne dni",
+    text: "Bierzesz tabletkę antykoncepcyjną — owulacja jest wyciszona.",
+    items: [],
+  },
+  pills_break: {
+    icon: "pill",
+    title: "Przerwa w tabletkach",
+    text: "Dni przerwy — możesz zauważyć krwawienie z odstawienia.",
+    items: [],
+  },
+  none: {
+    icon: "flower",
+    title: "Cykl",
+    text: "Zaznacz dzień, w którym zaczął się okres, aby Cyklia mogła pokazywać fazy i wskazówki.",
+    items: [],
+  },
+};

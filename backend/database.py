@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS entries (
     steps INTEGER,
     sleep_quality TEXT,
     sex TEXT,
+    bleeding TEXT,
+    digestive TEXT,
     UNIQUE (user_id, date),
     FOREIGN KEY (user_id) REFERENCES users (id)
 );
@@ -151,6 +153,8 @@ MIGRATIONS = [
     ("ALTER TABLE entries ADD COLUMN steps INTEGER", "steps"),
     ("ALTER TABLE entries ADD COLUMN sleep_quality TEXT", "sleep_quality"),
     ("ALTER TABLE entries ADD COLUMN sex TEXT", "sex"),
+    ("ALTER TABLE entries ADD COLUMN bleeding TEXT", "bleeding"),
+    ("ALTER TABLE entries ADD COLUMN digestive TEXT", "digestive"),
     # rozbudowana biblioteka artykułów (Inspiracje)
     ("ALTER TABLE articles ADD COLUMN slug TEXT", "slug"),
     ("ALTER TABLE articles ADD COLUMN intro TEXT DEFAULT ''", "intro"),
@@ -192,7 +196,7 @@ def migrate(conn=None):
     for sql, col in MIGRATIONS:
         if col in {"pill_mode", "pill_cycle_days", "pill_break_days", "pill_name", "pill_time"}:
             cols_set = cols
-        elif col in {"libido", "stress", "mucus", "weight", "steps", "sleep_quality", "sex"}:
+        elif col in {"libido", "stress", "mucus", "weight", "steps", "sleep_quality", "sex", "bleeding", "digestive"}:
             cols_set = ecols
         elif col == "session_id":
             cols_set = mcols

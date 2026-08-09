@@ -198,6 +198,27 @@ export default function CalendarPage() {
     }
   }
 
+  async function markPeriodStart() {
+    if (!selected) return;
+    setBusy(true);
+    try {
+      await api("/cycles", {
+        method: "POST",
+        body: {
+          start_date: selected,
+          end_date: addDays(selected, 4),
+        },
+      });
+      const c = await api("/cycles").catch(() => []);
+      setCycles(c || []);
+      reload();
+    } catch (err) {
+      alert(err.message || "Nie udało się zapisać");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const syms = (() => {
     try {
       return entry?.symptoms ? JSON.parse(entry.symptoms) : [];
@@ -226,6 +247,7 @@ export default function CalendarPage() {
     }
   })();
   const sexShown = sexItems.filter((x) => x && x !== "Dzień bez seksu");
+  const selectedIsPeriod = selected ? periodDays.has(selected) : false;
 
   return (
     <div className="cal-screen">
@@ -362,10 +384,53 @@ export default function CalendarPage() {
             </button>
 
             <div className="sheet-head">
-              <h3>{formatPL(selected)}</h3>
-              <span className="tag">{phaseLabel(selected)}</span>
+              <div className="sh-info">
+                <h3>{formatPL(selected)}</h3>
+                <span className="tag">{phaseLabel(selected)}</span>
+              </div>
+              <button
+                className="sh-add"
+                onClick={() =>
+                  navigate(
+                    `/dziennik${selected === today ? "" : `?date=${selected}`}`
+                  )
+                }
+                aria-label="Dodaj lub edytuj wpis"
+              >
+                <Icon name="plus" size={20} />
+              </button>
             </div>
 
+            <button
+              className={`sheet-btn ${selectedIsPeriod ? "done" : "soft"}`}
+              onClick={markPeriodStart}
+              disabled={busy || selectedIsPeriod}
+              style={{ marginBottom: 10 }}
+            >
+              <Icon name={selectedIsPeriod ? "check" : "droplet"} size={17} />
+              {selectedIsPeriod
+                ? "Ten dzień jest oznaczony jako okres"
+                : "Okres zaczął się tego dnia"}
+            </button>
+
+            <div className="sheet-row">
+              <span className="sr-label">Objawy</span>
+              <span className="sr-value">
+                {syms.length ? syms.slice(0, 4).join(", ") : "—"}
+              </span>
+            </div>
+            <div className="sheet-row">
+              <span className="sr-label">Obserwacje</span>
+              <span className="sr-value">
+                {entry?.notes ? entry.notes.slice(0, 48) + (entry.notes.length > 48 ? "…" : "") : "—"}
+              </span>
+            </div>
+            <div className="sheet-row">
+              <span className="sr-label">Aktywność</span>
+              <span className="sr-value">
+                {entry?.activity ? `${entry.activity} min` : "—"}
+              </span>
+            </div>
             <div className="sheet-row">
               <span className="sr-label">Temperatura</span>
               <span className="sr-value">
@@ -378,12 +443,6 @@ export default function CalendarPage() {
                 {moods.length
                   ? moods.map((m) => `${m.emoji} ${m.label}`).join(", ")
                   : "—"}
-              </span>
-            </div>
-            <div className="sheet-row">
-              <span className="sr-label">Objawy</span>
-              <span className="sr-value">
-                {syms.length ? syms.slice(0, 3).join(", ") : "—"}
               </span>
             </div>
             <div className="sheet-row">
@@ -440,20 +499,6 @@ export default function CalendarPage() {
                 )}
               </div>
             )}
-
-            <div className="sheet-actions">
-              <button
-                className="sheet-btn primary"
-                onClick={() =>
-                  navigate(
-                    `/dziennik${selected === today ? "" : `?date=${selected}`}`
-                  )
-                }
-              >
-                <Icon name="pen" size={17} />
-                {entry ? "Edytuj wpis" : "Dodaj wpis"}
-              </button>
-            </div>
           </div>
         </div>
       )}

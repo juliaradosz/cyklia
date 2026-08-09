@@ -1402,7 +1402,14 @@ select {
   margin: 4px auto 16px;
 }
 .sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 16px;
+}
+.sheet-head .sh-info {
+  min-width: 0;
 }
 .sheet-head h3 {
   margin: 0;
@@ -1412,6 +1419,23 @@ select {
 }
 .sheet-head .tag {
   margin-top: 8px;
+}
+.sh-add {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: var(--grad-main);
+  color: #fff;
+  box-shadow: var(--shadow-btn);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease;
+}
+.sh-add:active {
+  transform: scale(0.9);
 }
 .tag {
   display: inline-block;
@@ -1477,6 +1501,10 @@ select {
 .sheet-btn.danger {
   background: var(--red-100);
   color: var(--red);
+}
+.sheet-btn.done {
+  background: var(--green-100);
+  color: var(--green);
 }
 .sheet-close {
   position: absolute;
@@ -1557,6 +1585,60 @@ select {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.1px;
+}
+
+/* Podpowiedź fazy cyklu */
+.hint-card {
+  display: flex;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 233, 240, 0.88));
+  border: 1px solid rgba(231, 201, 216, 0.55);
+}
+.hint-card .h-ico {
+  flex: none;
+  margin-top: 2px;
+}
+.h-body {
+  min-width: 0;
+}
+.h-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--ink);
+}
+.h-title .h-phase {
+  color: var(--pink-600);
+  font-weight: 800;
+}
+.h-text {
+  margin: 5px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+.h-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.h-chip {
+  background: var(--pink-100);
+  color: var(--pink-600);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.j-sub-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 14px 0 8px;
 }
 
 /* Nastroje */

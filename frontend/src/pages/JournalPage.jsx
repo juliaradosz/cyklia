@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
+import { useCalendar } from "../hooks.js";
 import {
   todayISO,
   addDays,
+  daysBetween,
   formatPL,
   nowHM,
   MOODS,
   SYMPTOMS,
   LIBIDO,
   MUCUS,
+  BLEEDING,
+  DIGESTIVE,
+  SEX_ACT,
+  PHASE_HINTS,
 } from "../utils.js";
 import Icon from "../components/Icon.jsx";
 
@@ -27,6 +33,9 @@ const EMPTY = {
   stress: "",
   mucus: "",
   weight: "",
+  bleeding: [],
+  digestive: [],
+  sex: [],
 };
 
 const SLEEP_QUALITY = [
@@ -66,6 +75,14 @@ export default function JournalPage() {
   const [jumpDate, setJumpDate] = useState(today);
   const [pillLog, setPillLog] = useState(null);
   const [pillTimeInput, setPillTimeInput] = useState(nowHM());
+  const [cycles, setCycles] = useState([]);
+  const { data: cal } = useCalendar();
+
+  useEffect(() => {
+    api("/cycles")
+      .then(setCycles)
+      .catch(() => setCycles([]));
+  }, []);
 
   async function loadList() {
     try {
@@ -105,6 +122,9 @@ export default function JournalPage() {
           stress: e.stress ?? "",
           mucus: e.mucus ?? "",
           weight: e.weight ?? "",
+          bleeding: e.bleeding ? JSON.parse(e.bleeding) : [],
+          digestive: e.digestive ? JSON.parse(e.digestive) : [],
+          sex: e.sex ? JSON.parse(e.sex) : [],
         });
       } else {
         setForm(EMPTY);
@@ -144,6 +164,41 @@ export default function JournalPage() {
     }));
   }
 
+  function toggleIn(key, item) {
+    setForm((f) => ({
+      ...f,
+      [key]: f[key].includes(item)
+        ? f[key].filter((x) => x !== item)
+        : [...f[key], item],
+    }));
+  }
+
+  function setOne(key, item) {
+    setForm((f) => ({ ...f, [key]: f[key] === item ? "" : item }));
+  }
+
+  function phaseInfo() {
+    if (!cal) return PHASE_HINTS.none;
+    const onPills = !!cal.prediction.on_pills;
+    const dayType = cal.days[date] || "normal";
+    if (onPills) {
+      return dayType === "period" ? PHASE_HINTS.pills_break : PHASE_HINTS.pills_active;
+    }
+    if (dayType === "period") return PHASE_HINTS.period;
+    if (dayType === "ovulation") return PHASE_HINTS.ovulation;
+    if (dayType === "fertile") return PHASE_HINTS.fertile;
+    const starts = (cycles || [])
+      .map((c) => c.start_date)
+      .filter((s) => s <= date)
+      .sort();
+    if (!starts.length) return PHASE_HINTS.none;
+    const cycleDay = daysBetween(starts[starts.length - 1], date) + 1;
+    const cycleLen = cal.prediction.cycle_length || 28;
+    return cycleDay < cycleLen - 14 ? PHASE_HINTS.follicular : PHASE_HINTS.luteal;
+  }
+
+  const hint = phaseInfo();
+
   async function save(e) {
     e.preventDefault();
     setBusy(true);
@@ -164,6 +219,9 @@ export default function JournalPage() {
           stress: form.stress ? Number(form.stress) : null,
           mucus: form.mucus || null,
           weight: form.weight ? Number(form.weight) : null,
+          bleeding: form.bleeding,
+          digestive: form.digestive,
+          sex: form.sex,
         },
       });
       setSaved(true);
@@ -265,6 +323,48 @@ export default function JournalPage() {
       </div>
 
       <form onSubmit={save}>
+        <div className="j-section hint-card">
+          <span className="js-ico h-ico">
+            <Icon name={hint.icon} size={17} />
+          </span>
+          <div className="h-body">
+            <div className="h-title">
+              Dziś możesz zauważyć <span className="h-phase">· {hint.title}</span>
+            </div>
+            <p className="h-text">{hint.text}</p>
+            {hint.items.length > 0 && (
+              <div className="h-chips">
+                {hint.items.map((it) => (
+                  <span key={it} className="h-chip">
+                    {it}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="droplet" size={17} />
+            </span>
+            <b>Krwawienie</b>
+          </div>
+          <div className="symptoms-grid">
+            {BLEEDING.map((b) => (
+              <button
+                key={b}
+                type="button"
+                className={`symptom-chip ${form.bleeding.includes(b) ? "on" : ""}`}
+                onClick={() => toggleIn("bleeding", b)}
+              >
+                {b}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {pillLog && pillLog.needs_log && (
           <div className="j-section">
             <div className="j-sec-head">
@@ -299,6 +399,40 @@ export default function JournalPage() {
             {pillLog.warning && <div className="pill-warn">{pillLog.warning}</div>}
           </div>
         )}
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="heart" size={17} />
+            </span>
+            <b>Seks i libido</b>
+          </div>
+          <div className="sex-grid">
+            {SEX_ACT.map((a) => (
+              <button
+                key={a}
+                type="button"
+                className={`sex-chip ${form.sex.includes(a) ? "on" : ""}`}
+                onClick={() => toggleIn("sex", a)}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+          <div className="j-sub-label">Libido</div>
+          <div className="sex-grid">
+            {LIBIDO.map((l) => (
+              <button
+                key={l}
+                type="button"
+                className={`sex-chip ${form.libido === l ? "on" : ""}`}
+                onClick={() => setOne("libido", l)}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="j-section">
           <div className="j-sec-head">
@@ -356,39 +490,53 @@ export default function JournalPage() {
         <div className="j-section">
           <div className="j-sec-head">
             <span className="js-ico">
+              <Icon name="droplet" size={17} />
+            </span>
+            <b>Wydzielina</b>
+          </div>
+          <div className="symptoms-grid">
+            {MUCUS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                className={`symptom-chip ${form.mucus === m ? "on" : ""}`}
+                onClick={() => setOne("mucus", m)}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="zap" size={17} />
+            </span>
+            <b>Trawienie</b>
+          </div>
+          <div className="symptoms-grid">
+            {DIGESTIVE.map((d) => (
+              <button
+                key={d}
+                type="button"
+                className={`symptom-chip ${form.digestive.includes(d) ? "on" : ""}`}
+                onClick={() => toggleIn("digestive", d)}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
               <Icon name="flame" size={17} />
             </span>
             <b>Ciało</b>
           </div>
           <div className="vital-grid">
-            <div className="vital-field">
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
-                Libido
-              </label>
-              <select
-                value={form.libido}
-                onChange={(e) => setForm({ ...form, libido: e.target.value })}
-              >
-                <option value="">—</option>
-                {LIBIDO.map((l) => (
-                  <option key={l}>{l}</option>
-                ))}
-              </select>
-            </div>
-            <div className="vital-field">
-              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
-                Śluz szyjkowy
-              </label>
-              <select
-                value={form.mucus}
-                onChange={(e) => setForm({ ...form, mucus: e.target.value })}
-              >
-                <option value="">—</option>
-                {MUCUS.map((m) => (
-                  <option key={m}>{m}</option>
-                ))}
-              </select>
-            </div>
             <div className="vital-field">
               <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
                 Poziom stresu

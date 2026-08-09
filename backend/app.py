@@ -184,6 +184,19 @@ def create_app():
             datetime.strptime(start, "%Y-%m-%d")
         except (ValueError, TypeError):
             return jsonify({"error": "Podaj poprawną datę rozpoczęcia"}), 400
+        existing = db.query_one(
+            "SELECT * FROM cycles WHERE user_id = ? AND start_date = ?", (user_id, start)
+        )
+        if existing:
+            if end and (not existing["end_date"] or existing["end_date"] < end):
+                db.execute(
+                    "UPDATE cycles SET end_date = ? WHERE id = ?",
+                    (end, existing["id"]),
+                )
+                existing = db.query_one(
+                    "SELECT * FROM cycles WHERE id = ?", (existing["id"],)
+                )
+            return jsonify(existing), 200
         cid = db.execute(
             "INSERT INTO cycles (user_id, start_date, end_date, flow_level) "
             "VALUES (?, ?, ?, ?)",
@@ -283,30 +296,35 @@ def create_app():
             "steps": data.get("steps"),
             "sleep_quality": data.get("sleep_quality"),
             "sex": _to_json_list(data.get("sex")) if data.get("sex") is not None else None,
+            "bleeding": _to_json_list(data.get("bleeding")) if data.get("bleeding") is not None else None,
+            "digestive": _to_json_list(data.get("digestive")) if data.get("digestive") is not None else None,
         }
         if existing:
             db.execute(
                 "UPDATE entries SET temperature=?, mood=?, symptoms=?, notes=?, "
                 "water=?, sleep=?, activity=?, libido=?, stress=?, mucus=?, weight=?, "
-                "steps=?, sleep_quality=?, sex=? "
+                "steps=?, sleep_quality=?, sex=?, bleeding=?, digestive=? "
                 "WHERE id=?",
                 (
                     vals["temperature"], vals["mood"], vals["symptoms"], vals["notes"],
                     vals["water"], vals["sleep"], vals["activity"], vals["libido"],
                     vals["stress"], vals["mucus"], vals["weight"], vals["steps"],
-                    vals["sleep_quality"], vals["sex"], existing["id"],
+                    vals["sleep_quality"], vals["sex"], vals["bleeding"], vals["digestive"],
+                    existing["id"],
                 ),
             )
         else:
             db.execute(
                 "INSERT INTO entries (user_id, date, temperature, mood, symptoms, notes, "
-                "water, sleep, activity, libido, stress, mucus, weight, steps, sleep_quality, sex) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "water, sleep, activity, libido, stress, mucus, weight, steps, sleep_quality, sex, "
+                "bleeding, digestive) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     user_id, day, vals["temperature"], vals["mood"], vals["symptoms"],
                     vals["notes"], vals["water"], vals["sleep"], vals["activity"],
                     vals["libido"], vals["stress"], vals["mucus"], vals["weight"],
                     vals["steps"], vals["sleep_quality"], vals["sex"],
+                    vals["bleeding"], vals["digestive"],
                 ),
             )
         return jsonify(db.query_one("SELECT * FROM entries WHERE user_id = ? AND date = ?", (user_id, day)))
