@@ -16,7 +16,7 @@ export default defineConfig({
         lang: "pl",
         start_url: "/",
         scope: "/",
-        display: "standalone",
+        display: "fullscreen",
         orientation: "portrait",
         theme_color: "#e0638a",
         background_color: "#fff5f7",
