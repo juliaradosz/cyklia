@@ -9,6 +9,7 @@ schemat z ulotką lub farmaceutą.
 PILLS = [
     # --- Złożone, standardowy schemat 21+7 ---
     {"name": "Yasmin", "type": "złożone", "active": 21, "break": 7},
+    {"name": "Vibin Mini", "type": "złożone", "active": 21, "break": 7},
     {"name": "Sibilla", "type": "złożone", "active": 21, "break": 7},
     {"name": "Symicia", "type": "złożone", "active": 21, "break": 7},
     {"name": "Oelair", "type": "złożone", "active": 21, "break": 7},
