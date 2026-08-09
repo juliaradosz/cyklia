@@ -120,7 +120,9 @@ def day_type_for(day, cycle_starts, period_end_dates, prediction):
         # przy tabletkach brak owulacji/dni płodnych; ewentualny okres
         # przewidywany jest w przerwie między blistrami
         nxt = prediction.get("next_period_start")
-        brk = prediction.get("pill_break_days") or 7
+        brk = prediction.get("pill_break_days")
+        if brk is None:
+            brk = 7
         if nxt:
             p = parse_date(nxt)
             p_end = p + timedelta(days=brk - 1)

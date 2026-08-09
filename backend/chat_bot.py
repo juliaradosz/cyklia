@@ -75,10 +75,12 @@ def _personal_reply(message, ctx):
     asking_definition = any(k in msg for k in ["co to", "czym jest", "czym jest", "definicj", "co oznacza"])
     if not asking_definition and ("owulacj" in msg or "dni płodn" in msg or "dni plodn" in msg):
         if ctx.get("on_pills"):
+            name = ctx.get("pill_name") or "tabletki antykoncepcyjne"
             return (
-                "Stosujesz tabletki antykoncepcyjne, więc owulacja i dni płodne "
-                "nie występują — hormonoterapia je blokuje. Nie musisz śledzić "
-                "okna płodności. Pamiętaj tylko o regularnym przyjmowaniu tabletek."
+                f"Stosujesz {name}, więc owulacja i dni płodne nie występują — "
+                "hormonoterapia je blokuje. Nie musisz śledzić okna płodności. "
+                f"Pamiętaj tylko o regularnym przyjmowaniu tabletek "
+                f"(u Ciebie zwykle o {ctx.get('pill_time')})."
             )
         if ctx.get("ovulation_date"):
             ov = _date_text(ctx["ovulation_date"])
@@ -128,6 +130,109 @@ def _personal_reply(message, ctx):
 # ---------------------------------------------------------------------------
 # Odpowiedzi "wiedza" (lokalne, bez AI)
 # ---------------------------------------------------------------------------
+
+def _pill_scheme(ctx):
+    return f"{ctx.get('pill_cycle_days') or 21}+{ctx.get('pill_break_days', 7)}"
+
+
+def _pill_regimen_tips(ctx):
+    parts = [
+        f"Przez {ctx.get('pill_cycle_days') or 21} dni przyjmujesz tabletki aktywne"
+    ]
+    if ctx.get("pill_break_days", 7) > 0:
+        parts.append(
+            f"a przez {ctx.get('pill_break_days', 7)} dni masz przerwę "
+            "(wtedy pojawia się krwawienie z odstawienia)"
+        )
+    else:
+        parts.append("i przyjmujesz tabletki bez przerwy (placebo nie występuje)")
+    time = ctx.get("pill_time")
+    if time:
+        parts.append(f"staraj się brać ją codziennie o tej samej porze — u Ciebie to {time}")
+    return ". ".join(parts) + "."
+
+
+def _missed_pill_advice(ctx):
+    name = ctx.get("pill_name") or "Twoja tabletka"
+    if ctx.get("pill_break_days", 7) == 0:
+        window = "3 godzin"
+        extra = (
+            "Tabletki progestagenowe (przyjmowane bez przerwy) mają bardzo krótkie "
+            "okno — spóźnienie powyżej 3 godzin znacznie obniża skuteczność. Weź "
+            "tabletkę jak najszybciej i postępuj według ulotki."
+        )
+    else:
+        window = "12 godzin"
+        extra = (
+            "Przy tabletkach złożonych spóźnienie do 12 godzin zwykle nie obniża "
+            "skuteczności. Powyżej 12 godzin zastosuj się do ulotki swojego środka "
+            "i w razie potrzeby rozważ dodatkowe zabezpieczenie."
+        )
+    return (
+        f"Przyjmujesz {name} w schemacie {_pill_scheme(ctx)} — dla tego typu "
+        f"obowiązuje okno ok. {window}. {extra} Zawsze potwierdź szczegóły w "
+        "ulotce; w razie wątpliwości skonsultuj się z lekarzem lub farmaceutą."
+    )
+
+
+def _pill_reply(message, ctx):
+    """Odpowiedzi o konkretnym środku użytkowniczki (gdy włączone tabletki)."""
+    if not ctx or not ctx.get("on_pills"):
+        return None
+    msg = message.lower()
+
+    asking_about_their_pill = any(
+        k in msg
+        for k in [
+            "jaką biorę", "jaka biorę", "co biorę", "co przyjmuję", "co przyjmuje",
+            "jakie tabletki", "jaką tabletkę", "jaka tabletke", "jaką tabletke",
+            "moja tabletka", "moją tabletkę", "moją tabletke", "mój środek",
+            "moj srodek", "jaka antykoncepcja", "jaką antykoncepcję", "jaką stosuję",
+        ]
+    )
+    if asking_about_their_pill:
+        return (
+            f"Zgodnie z Twoim profilem przyjmujesz "
+            f"{ctx.get('pill_name') or 'niezaznaczony w aplikacji środek'} "
+            f"w schemacie {_pill_scheme(ctx)}, zwykle o {ctx.get('pill_time')}. "
+            + _pill_regimen_tips(ctx)
+        )
+
+    pill_topic = any(
+        k in msg
+        for k in [
+            "tablet", "pigułk", "pigulk", "antykoncepcj", "blister",
+            "opakowani", "przerw", "placebo",
+        ]
+    )
+    if not pill_topic:
+        return None
+
+    if any(
+        k in msg
+        for k in [
+            "spóźni", "spozni", "późno", "pozno", "za późno", "za pozno",
+            "zapomniała", "zapomniala", "pominęła", "pominela", "opuściła", "opuscila",
+        ]
+    ):
+        return _missed_pill_advice(ctx)
+
+    if any(
+        k in msg
+        for k in [
+            "jak brać", "jak brac", "jak przyjmow", "kiedy brać", "kiedy brac",
+            "o której", "o ktorej", "jak stosow", "jak stosować", "jak sie bierze",
+            "jak się bierze", "przerw", "placebo", "koniec blistr", "nowe opakowani",
+            "nowy blister", "kolejny blister",
+        ]
+    ):
+        return (
+            f"Przyjmujesz {ctx.get('pill_name') or 'swoją tabletkę'} "
+            f"w schemacie {_pill_scheme(ctx)}. " + _pill_regimen_tips(ctx)
+        )
+
+    return None
+
 
 def _knowledge_reply(message):
     msg = message.lower()
@@ -360,6 +465,10 @@ def local_reply(message, context=None):
     if personal:
         return personal
 
+    pill = _pill_reply(message, context)
+    if pill:
+        return pill
+
     knowledge = _knowledge_reply(message)
     if knowledge:
         return knowledge
@@ -390,7 +499,16 @@ def _context_text(context):
         return ""
     parts = []
     if context.get("on_pills"):
-        parts.append("użytkowniczka stosuje tabletki antykoncepcyjne, więc nie ma owulacji ani dni płodnych")
+        line = "użytkowniczka stosuje tabletki antykoncepcyjne, więc nie ma owulacji ani dni płodnych"
+        if context.get("pill_name"):
+            line += (
+                f" (środek: {context['pill_name']}, schemat "
+                f"{context.get('pill_cycle_days') or 21}+{context.get('pill_break_days', 7)}"
+            )
+            if context.get("pill_time"):
+                line += f", zwykła pora przyjmowania {context['pill_time']}"
+            line += ")"
+        parts.append(line)
     if context.get("next_period_start"):
         nxt = _date_text(context["next_period_start"])
         days = context.get("days_to_period")

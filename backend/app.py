@@ -291,7 +291,7 @@ def create_app():
             period_length=user["period_length_default"],
             pills=bool(user["pill_mode"]),
             pill_cycle=user["pill_cycle_days"] or 21,
-            pill_break=user["pill_break_days"] or 7,
+            pill_break=(user["pill_break_days"] if user["pill_break_days"] is not None else 7),
         )
         # zakres widoczny: od pierwszego wpisu do +90 dni w przyszłość
         min_day = min(starts) if starts else date.today().isoformat()
@@ -578,6 +578,11 @@ def _fmt_delay(minutes):
     return f"ok. {hours:.1f}".replace(".", ",") + " godz."
 
 
+def _pill_break_value(user):
+    v = user.get("pill_break_days")
+    return v if v is not None else 7
+
+
 def _pill_status(user_id, day):
     """Status tabletki na dany dzień: czy trzeba przyjąć, czy już wzięta, czy spóźniona."""
     user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -593,7 +598,7 @@ def _pill_status(user_id, day):
         period_length=user["period_length_default"],
         pills=on_pills,
         pill_cycle=user["pill_cycle_days"] or 21,
-        pill_break=user["pill_break_days"] or 7,
+        pill_break=_pill_break_value(user),
     )
     day_type = cyc.day_type_for(day, starts, ends, pred) if on_pills else "normal"
     needs_log = on_pills and day_type != "period"
@@ -601,7 +606,7 @@ def _pill_status(user_id, day):
         "SELECT * FROM pill_logs WHERE user_id = ? AND date = ?", (user_id, day)
     )
     expected = user["pill_time"] or "12:00"
-    threshold_h = 3 if (user["pill_break_days"] or 7) == 0 else 12
+    threshold_h = 3 if _pill_break_value(user) == 0 else 12
     late = False
     warning = None
     taken_at = log["taken_at"] if log else None
@@ -651,7 +656,7 @@ def _chat_context(user_id):
         period_length=user["period_length_default"],
         pills=bool(user["pill_mode"]),
         pill_cycle=user["pill_cycle_days"] or 21,
-        pill_break=user["pill_break_days"] or 7,
+        pill_break=_pill_break_value(user),
     )
     today = date.today()
     cycle_day = None
@@ -667,8 +672,25 @@ def _chat_context(user_id):
     if starts or pred.get("on_pills"):
         ends = [c["end_date"] for c in cycles if c["end_date"]]
         today_type = cyc.day_type_for(today.isoformat(), starts, ends, pred)
+
+    pill_name = user["pill_name"] or ""
+    pill_type = None
+    if pill_name:
+        try:
+            import pills as pills_data
+            found = next((p for p in pills_data.PILLS if p["name"] == pill_name), None)
+            if found:
+                pill_type = found.get("type")
+        except ImportError:
+            pass
+
     return {
         "on_pills": bool(user["pill_mode"]),
+        "pill_name": pill_name,
+        "pill_type": pill_type,
+        "pill_cycle_days": user["pill_cycle_days"] or 21,
+        "pill_break_days": (user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+        "pill_time": user["pill_time"] or "12:00",
         "next_period_start": pred.get("next_period_start"),
         "ovulation_date": pred.get("ovulation_date"),
         "fertile_start": pred.get("fertile_start"),
