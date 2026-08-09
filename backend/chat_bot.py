@@ -384,12 +384,44 @@ def local_reply(message, context=None):
     )
 
 
+def _context_text(context):
+    """Kontekst kalendarza użytkownika jako naturalny tekst (nie JSON)."""
+    if not context:
+        return ""
+    parts = []
+    if context.get("on_pills"):
+        parts.append("użytkowniczka stosuje tabletki antykoncepcyjne, więc nie ma owulacji ani dni płodnych")
+    if context.get("next_period_start"):
+        nxt = _date_text(context["next_period_start"])
+        days = context.get("days_to_period")
+        if days is not None and days >= 0:
+            parts.append(f"kolejny okres przewidywany na {nxt} (za {days} dni)")
+        else:
+            parts.append(f"kolejny okres przewidywany na {nxt}")
+    if context.get("ovulation_date"):
+        parts.append(f"owulacja przewidywana na {_date_text(context['ovulation_date'])}")
+        if context.get("fertile_start") and context.get("fertile_end"):
+            parts.append(
+                f"dni płodne: {_date_text(context['fertile_start'])} – {_date_text(context['fertile_end'])}"
+            )
+    if context.get("cycle_day"):
+        parts.append(f"dzisiaj jest {context['cycle_day']}. dzień cyklu")
+    if context.get("today_type"):
+        parts.append(f"dzisiejszy dzień to: {context['today_type']}")
+    if not parts:
+        return ""
+    return "; ".join(parts) + "."
+
+
 def llm_reply(message, api_url, api_key, model, history, context=None):
     ctx_note = ""
-    if context:
+    facts = _context_text(context)
+    if facts:
         ctx_note = (
-            f"Kontekst użytkownika z aplikacji: {json.dumps(context, ensure_ascii=False)}. "
-            "Jeśli pytanie dotyczy terminów (okres, owulacja itd.), użyj tych dat."
+            "Fakty z kalendarza użytkowniczki (używaj ich tylko wtedy, gdy pyta o "
+            f"terminy): {facts} Odpowiadaj naturalnie po polsku, daty podawaj w "
+            "formacie np. niedziela, 6 września. Nie wspominaj o żadnych danych "
+            "technicznych, nazwach pól ani JSON — po prostu rozmawiaj z człowiekiem."
         )
     body = {
         "model": model,
