@@ -251,19 +251,19 @@ export default function Dashboard() {
         <div className="ds-bubbles">
           <button className="ds-bubble" onClick={openPeriod}>
             <span className="ds-b-ico">
-              <Icon name="calendar" size={18} />
+              <Icon name="calendar" size={22} />
             </span>
             Edytuj okres
           </button>
           <button className="ds-bubble" onClick={() => navigate("/dziennik")}>
             <span className="ds-b-ico">
-              <Icon name="heart" size={18} />
+              <Icon name="flame" size={22} />
             </span>
             Objawy
           </button>
           <button className="ds-bubble" onClick={openSex}>
             <span className="ds-b-ico">
-              <Icon name="heart" size={18} />
+              <Icon name="heart" size={22} />
             </span>
             Stosunek
           </button>
@@ -308,25 +308,23 @@ export default function Dashboard() {
       <div className="section-head">
         <h2>Moje codzienne inspiracje</h2>
       </div>
-      <div className="inspo-list">
-        {inspos.length === 0 && (
-          <p className="muted" style={{ fontSize: 13, padding: "6px 2px" }}>
-            Dodaj pierwszy okres, by zobaczyć dopasowane inspiracje.
-          </p>
-        )}
-        {inspos.map((a) => (
-          <Link key={a.id} to={`/inspiracje/${a.id}`} className="inspo-card">
-            <div className="inspo-txt">
-              <span className="inspo-badge">{a.badge || a.category}</span>
-              <b>{a.title}</b>
-              <span className="inspo-sum">{a.summary}</span>
-            </div>
-            <span className="inspo-arrow">
-              <Icon name="chevron-right" size={18} />
-            </span>
-          </Link>
-        ))}
-      </div>
+      {inspos.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13, padding: "6px 2px" }}>
+          Dodaj pierwszy okres, by zobaczyć dopasowane inspiracje.
+        </p>
+      ) : (
+        <div className="inspo-scroll">
+          {inspos.map((a, i) => (
+            <Link
+              key={a.id}
+              to={`/inspiracje/${a.id}`}
+              className={`inspo-tile tile-${i % 4}`}
+            >
+              {a.title}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {!currentPeriod && (
         <button
