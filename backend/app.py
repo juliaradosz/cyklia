@@ -351,6 +351,51 @@ def create_app():
         sleeps = [e["sleep"] for e in entries if e["sleep"] is not None]
         activities = [e["activity"] for e in entries if e["activity"] is not None]
         steps_list = [e["steps"] for e in entries if e["steps"]]
+
+        user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+        pred = cyc.build_calendar(
+            starts,
+            cycle_length=user["cycle_length_default"],
+            period_length=user["period_length_default"],
+            pills=bool(user["pill_mode"]),
+            pill_cycle=user["pill_cycle_days"] or 21,
+            pill_break=(user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+        )
+        phase_order = (
+            ["Aktywne dni", "Przerwa"]
+            if pred.get("on_pills")
+            else ["Okres", "Faza folikularna", "Faza lutealna"]
+        )
+        agg = {}
+        for e in entries:
+            ph = _entry_phase(
+                e["date"], pred, starts, period_length=user["period_length_default"]
+            )
+            if not ph:
+                continue
+            d = agg.setdefault(ph, {"count": 0, "sleep": [], "steps": [], "activity": []})
+            d["count"] += 1
+            if e["sleep"] is not None:
+                d["sleep"].append(e["sleep"])
+            if e["steps"]:
+                d["steps"].append(e["steps"])
+            if e["activity"] is not None:
+                d["activity"].append(e["activity"])
+        phases = [
+            {
+                "phase": ph,
+                "count": agg[ph]["count"],
+                "sleep": round(sum(agg[ph]["sleep"]) / len(agg[ph]["sleep"]), 1) if agg[ph]["sleep"] else None,
+                "steps": round(sum(agg[ph]["steps"]) / len(agg[ph]["steps"])) if agg[ph]["steps"] else None,
+                "activity": round(sum(agg[ph]["activity"]) / len(agg[ph]["activity"])) if agg[ph]["activity"] else None,
+            }
+            for ph in phase_order
+            if ph in agg
+        ]
+        sleep_trend = [
+            [e["date"], e["sleep"]] for e in entries if e["sleep"] is not None
+        ][-14:]
+        steps_trend = [[e["date"], e["steps"]] for e in entries if e["steps"]][-14:]
         return jsonify({
             "cycle_count": len(starts),
             "average_cycle": round(sum(lengths) / len(lengths), 1) if lengths else None,
@@ -363,6 +408,9 @@ def create_app():
             "average_sleep": round(sum(sleeps) / len(sleeps), 1) if sleeps else None,
             "average_activity": round(sum(activities) / len(activities), 1) if activities else None,
             "total_steps": sum(steps_list),
+            "phases": phases,
+            "sleep_trend": sleep_trend,
+            "steps_trend": steps_trend,
         })
 
     # ---------- Artykuły (sekcja Inspiracje) ----------
@@ -738,6 +786,39 @@ def _parse_json(value, default=None):
         except (ValueError, TypeError):
             return default
     return default
+
+
+def _entry_phase(day, prediction, cycle_starts, period_length=5):
+    """Klasyfikuje dzień wpisu do fazy cyklu do korelacji w statystykach.
+
+    Dla tabletek: aktywne dni vs przerwa. Dla naturalnego cyklu: faza liczona
+    od ostatniej zarejestrowanej miesiączki (okres / folikularna / lutealna).
+    """
+    try:
+        d = datetime.strptime(day, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+    if prediction.get("on_pills"):
+        day_type = cyc.day_type_for(day, cycle_starts, [], prediction)
+        return "Przerwa" if day_type == "period" else "Aktywne dni"
+    cycle = prediction.get("cycle_length") or 28
+    period_len = int(period_length or 5)
+    last = None
+    for s in sorted(cycle_starts):
+        try:
+            sd = datetime.strptime(s, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            continue
+        if sd <= d:
+            last = sd
+    if last is None:
+        return None
+    idx = (d - last).days
+    if idx < period_len:
+        return "Okres"
+    if idx < cycle - 14:
+        return "Faza folikularna"
+    return "Faza lutealna"
 
 
 def _optional_user_id():

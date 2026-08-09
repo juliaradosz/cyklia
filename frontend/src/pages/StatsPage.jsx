@@ -2,6 +2,52 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { shortPL, MOODS } from "../utils.js";
 
+function Bars({ label, rows, fmt }) {
+  const vals = rows.filter((r) => r.v != null);
+  if (!vals.length) return null;
+  const max = Math.max(...vals.map((r) => r.v)) || 1;
+  return (
+    <div className="mb">
+      <div className="row">
+        <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
+      </div>
+      {vals.map((r) => (
+        <div key={r.label} className="mb">
+          <div className="row">
+            <span style={{ fontSize: 13 }}>{r.label}</span>
+            <span className="muted">{fmt ? fmt(r.v) : r.v}</span>
+          </div>
+          <div className="bar">
+            <div style={{ width: `${(r.v / max) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Spark({ points, tip }) {
+  if (!points || points.length < 2) return null;
+  const min = Math.min(...points.map((p) => p[1]));
+  const max = Math.max(...points.map((p) => p[1]));
+  const range = Math.max(max - min, 0.1);
+  return (
+    <div className="spark-row">
+      {points.map(([d, v]) => (
+        <div
+          key={d}
+          className="spark-col"
+          title={`${shortPL(d)}: ${tip(v)}`}
+          style={{ height: `${((v - min) / range) * 100}%` }}
+        >
+          <span className="val">{v}</span>
+          <span className="tip">{shortPL(d)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function StatsPage() {
   const [stats, setStats] = useState(null);
 
@@ -149,6 +195,59 @@ export default function StatsPage() {
               </div>
             </div>
           ))
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Sen i ruch a faza cyklu</h2>
+        {stats.phases && stats.phases.length ? (
+          <>
+            <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+              Średnie w każdej fazie — zobaczysz, kiedy śpisz i ruszasz się
+              najwięcej.
+            </p>
+            <Bars
+              label="Średni sen (h)"
+              rows={stats.phases.map((p) => ({ label: p.phase, v: p.sleep }))}
+            />
+            <Bars
+              label="Średnie kroki"
+              rows={stats.phases.map((p) => ({ label: p.phase, v: p.steps }))}
+              fmt={(v) => v.toLocaleString("pl-PL")}
+            />
+            <Bars
+              label="Średnia aktywność (min)"
+              rows={stats.phases.map((p) => ({ label: p.phase, v: p.activity }))}
+            />
+          </>
+        ) : (
+          <p className="muted">
+            Zapisuj sen, kroki i aktywność w dzienniku, by zobaczyć, jak
+            zmieniają się w trakcie cyklu.
+          </p>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Sen i kroki — ostatnie 14 dni</h2>
+        <p className="muted" style={{ fontSize: 12 }}>
+          Sen (h)
+        </p>
+        {stats.sleep_trend && stats.sleep_trend.length >= 2 ? (
+          <Spark points={stats.sleep_trend} tip={(v) => `${v} h`} />
+        ) : (
+          <p className="muted">Za mało danych o śnie.</p>
+        )}
+        <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>
+          Kroki
+        </p>
+        {stats.steps_trend && stats.steps_trend.length >= 2 ? (
+          <Spark
+            points={stats.steps_trend}
+            tip={(v) => `${v.toLocaleString("pl-PL")} kroków`}
+          />
+        ) : (
+          <p className="muted">Za mało danych o krokach.</p>
         )}
       </div>
 
