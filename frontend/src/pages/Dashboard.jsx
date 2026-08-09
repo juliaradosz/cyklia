@@ -213,6 +213,7 @@ export default function Dashboard() {
 
   return (
     <div className="dash">
+      <div className="dash-bg" />
       <div className="dash-hero">
         <div className="dash-top">
           <div className="dash-date">{dayMonthPL(today)}</div>

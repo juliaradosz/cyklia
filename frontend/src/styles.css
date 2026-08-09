@@ -2485,9 +2485,24 @@ select {
 
 /* ---------- Dashboard "jedno okienko" ---------- */
 .dash {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.dash-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 250, 252, 0.5) 0%,
+      rgba(255, 238, 246, 0.35) 100%
+    ),
+    url("/background.jpg") center / cover no-repeat;
 }
 
 .dash-hero {
@@ -2495,14 +2510,11 @@ select {
   border-radius: 26px;
   overflow: hidden;
   padding: 16px 18px 18px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 250, 252, 0.72) 0%,
-      rgba(255, 238, 246, 0.55) 100%
-    ),
-    url("/background.jpg") center / cover no-repeat;
-  box-shadow: 0 10px 30px rgba(94, 38, 66, 0.12);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 10px 30px rgba(94, 38, 66, 0.1);
 }
 
 .dash-top {
@@ -2583,6 +2595,21 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 22px;
+  padding: 14px 16px;
+}
+.dash .section-head h2 {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 14px;
+  padding: 6px 12px;
+  margin: 0;
 }
 .ds-left {
   min-width: 0;
