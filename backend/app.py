@@ -107,6 +107,14 @@ def create_app():
 
     # ---------- Tabletki — dzienny log (czy wzięta i o której) ----------
 
+    @app.get("/api/pills/log/dates")
+    @auth.auth_required
+    def list_pill_log_dates(user_id):
+        rows = db.query(
+            "SELECT date FROM pill_logs WHERE user_id = ? ORDER BY date", (user_id,)
+        )
+        return jsonify({"dates": [r["date"] for r in rows]})
+
     @app.get("/api/pills/log")
     @auth.auth_required
     def get_pill_log(user_id):
