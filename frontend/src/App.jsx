@@ -8,8 +8,8 @@ import CalendarPage from "./pages/CalendarPage.jsx";
 import JournalPage from "./pages/JournalPage.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
-import ArticlesPage from "./pages/ArticlesPage.jsx";
-import ArticlePage from "./pages/ArticlePage.jsx";
+import InspiracjePage from "./pages/InspiracjePage.jsx";
+import InspirationArticlePage from "./pages/InspirationArticlePage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 
 function Protected({ children }) {
@@ -38,8 +38,8 @@ export default function App() {
         <Route path="dziennik" element={<JournalPage />} />
         <Route path="statystyki" element={<StatsPage />} />
         <Route path="czat" element={<ChatPage />} />
-        <Route path="artykuly" element={<ArticlesPage />} />
-        <Route path="artykuly/:id" element={<ArticlePage />} />
+        <Route path="inspiracje" element={<InspiracjePage />} />
+        <Route path="inspiracje/:id" element={<InspirationArticlePage />} />
         <Route path="profil" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

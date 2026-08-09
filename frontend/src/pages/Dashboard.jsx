@@ -193,8 +193,8 @@ export default function Dashboard() {
           <Link to="/czat" className="btn small ghost">
             💬 Zapytaj asystenta
           </Link>
-          <Link to="/artykuly" className="btn small ghost">
-            📖 Artykuły
+          <Link to="/inspiracje" className="btn small ghost">
+            📖 Inspiracje
           </Link>
         </div>
       </div>

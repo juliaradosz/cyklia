@@ -50,11 +50,30 @@ CREATE TABLE IF NOT EXISTS entries (
 
 CREATE TABLE IF NOT EXISTS articles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE,
     title TEXT NOT NULL,
     category TEXT NOT NULL,
     summary TEXT NOT NULL,
+    intro TEXT DEFAULT '',
+    read_minutes INTEGER DEFAULT 5,
+    illustration TEXT DEFAULT 'bloom',
+    tone TEXT DEFAULT 'rose',
+    badge TEXT DEFAULT '',
+    phase TEXT DEFAULT 'any',
+    keywords TEXT DEFAULT '',
+    related TEXT DEFAULT '[]',
     content TEXT NOT NULL,
     created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_articles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    article_id INTEGER NOT NULL,
+    saved_at TEXT NOT NULL,
+    UNIQUE (user_id, article_id),
+    FOREIGN KEY (user_id) REFERENCES users (id),
+    FOREIGN KEY (article_id) REFERENCES articles (id)
 );
 
 CREATE TABLE IF NOT EXISTS posts (
@@ -103,6 +122,16 @@ MIGRATIONS = [
     ("ALTER TABLE entries ADD COLUMN stress INTEGER", "stress"),
     ("ALTER TABLE entries ADD COLUMN mucus TEXT", "mucus"),
     ("ALTER TABLE entries ADD COLUMN weight REAL", "weight"),
+    # rozbudowana biblioteka artykułów (Inspiracje)
+    ("ALTER TABLE articles ADD COLUMN slug TEXT", "slug"),
+    ("ALTER TABLE articles ADD COLUMN intro TEXT DEFAULT ''", "intro"),
+    ("ALTER TABLE articles ADD COLUMN read_minutes INTEGER DEFAULT 5", "read_minutes"),
+    ("ALTER TABLE articles ADD COLUMN illustration TEXT DEFAULT 'bloom'", "illustration"),
+    ("ALTER TABLE articles ADD COLUMN tone TEXT DEFAULT 'rose'", "tone"),
+    ("ALTER TABLE articles ADD COLUMN badge TEXT DEFAULT ''", "badge"),
+    ("ALTER TABLE articles ADD COLUMN phase TEXT DEFAULT 'any'", "phase"),
+    ("ALTER TABLE articles ADD COLUMN keywords TEXT DEFAULT ''", "keywords"),
+    ("ALTER TABLE articles ADD COLUMN related TEXT DEFAULT '[]'", "related"),
 ]
 
 
@@ -127,13 +156,20 @@ def migrate(conn=None):
         conn = get_db()
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
     ecols = {r["name"] for r in conn.execute("PRAGMA table_info(entries)")}
+    acols = {r["name"] for r in conn.execute("PRAGMA table_info(articles)")}
     for sql, col in MIGRATIONS:
-        table = "users" if col in [
-            "pill_mode", "pill_cycle_days", "pill_break_days", "pill_name"
-        ] else "entries"
-        cols_set = cols if table == "users" else ecols
+        if col in {"pill_mode", "pill_cycle_days", "pill_break_days", "pill_name"}:
+            cols_set = cols
+        elif col in {"libido", "stress", "mucus", "weight"}:
+            cols_set = ecols
+        else:
+            cols_set = acols
         if col not in cols_set:
             conn.execute(sql)
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_slug ON articles (slug)")
+    except Exception:
+        pass
     if own:
         conn.commit()
         conn.close()

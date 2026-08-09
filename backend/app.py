@@ -296,19 +296,77 @@ def create_app():
             "entry_count": len(entries),
         })
 
-    # ---------- Artykuły ----------
+    # ---------- Artykuły (sekcja Inspiracje) ----------
 
     @app.get("/api/articles")
     def list_articles():
-        rows = db.query("SELECT id, title, category, summary, created_at FROM articles ORDER BY id")
-        return jsonify(rows)
+        uid = _optional_user_id()
+        saved = _saved_ids(uid) if uid else set()
+        rows = db.query(
+            "SELECT id, slug, title, category, summary, intro, read_minutes, "
+            "illustration, tone, badge, phase, keywords, related, created_at "
+            "FROM articles ORDER BY category, id"
+        )
+        out = []
+        for r in rows:
+            m = dict(r)
+            m["saved"] = m["id"] in saved
+            m["related"] = _parse_json(m.get("related"), [])
+            out.append(m)
+        return jsonify(out)
 
     @app.get("/api/articles/<int:aid>")
     def get_article(aid):
+        uid = _optional_user_id()
         row = db.query_one("SELECT * FROM articles WHERE id = ?", (aid,))
         if not row:
             return jsonify({"error": "Nie znaleziono artykułu"}), 404
-        return jsonify(row)
+        out = dict(row)
+        out["content"] = _parse_json(out.get("content"), {})
+        out["related"] = _parse_json(out.get("related"), [])
+        out["saved"] = bool(uid) and db.query_one(
+            "SELECT 1 AS x FROM user_articles WHERE user_id = ? AND article_id = ?",
+            (uid, aid),
+        ) is not None
+        return jsonify(out)
+
+    @app.post("/api/articles/<int:aid>/save")
+    @auth.auth_required
+    def toggle_saved(user_id, aid):
+        row = db.query_one("SELECT id FROM articles WHERE id = ?", (aid,))
+        if not row:
+            return jsonify({"error": "Nie znaleziono artykułu"}), 404
+        existing = db.query_one(
+            "SELECT id FROM user_articles WHERE user_id = ? AND article_id = ?",
+            (user_id, aid),
+        )
+        if existing:
+            db.execute("DELETE FROM user_articles WHERE id = ?", (existing["id"],))
+            return jsonify({"saved": False})
+        db.execute(
+            "INSERT INTO user_articles (user_id, article_id, saved_at) VALUES (?, ?, ?)",
+            (user_id, aid, db.now_iso()),
+        )
+        return jsonify({"saved": True})
+
+    @app.get("/api/saved-articles")
+    @auth.auth_required
+    def list_saved(user_id):
+        rows = db.query(
+            "SELECT a.id, a.slug, a.title, a.category, a.summary, a.intro, "
+            "a.read_minutes, a.illustration, a.tone, a.badge, a.phase, a.keywords, "
+            "a.related, ua.saved_at AS saved_at "
+            "FROM user_articles ua JOIN articles a ON a.id = ua.article_id "
+            "WHERE ua.user_id = ? ORDER BY ua.saved_at DESC",
+            (user_id,),
+        )
+        out = []
+        for r in rows:
+            m = dict(r)
+            m["saved"] = True
+            m["related"] = _parse_json(m.get("related"), [])
+            out.append(m)
+        return jsonify(out)
 
     # ---------- Czat ----------
 
@@ -433,6 +491,34 @@ def _to_json_list(value):
         except ValueError:
             return json.dumps([value], ensure_ascii=False)
     return "[]"
+
+
+def _parse_json(value, default=None):
+    import json
+
+    if isinstance(value, (list, dict)):
+        return value
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (ValueError, TypeError):
+            return default
+    return default
+
+
+def _optional_user_id():
+    """Zwraca user_id, jeśli nagłówek zawiera poprawny token (opcjonalna autoryzacja)."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth.decode_token(auth_header[7:])
+    return None
+
+
+def _saved_ids(user_id):
+    rows = db.query(
+        "SELECT article_id FROM user_articles WHERE user_id = ?", (user_id,)
+    )
+    return {r["article_id"] for r in rows}
 
 
 app = create_app()
