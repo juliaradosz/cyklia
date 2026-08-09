@@ -6,6 +6,7 @@ import {
   addDays,
   shortPL,
   formatPL,
+  nowHM,
   MOODS,
 } from "../utils.js";
 import { api } from "../api/client.js";
@@ -17,17 +18,21 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [entry, setEntry] = useState(null);
   const [cycles, setCycles] = useState([]);
+  const [pillLog, setPillLog] = useState(null);
+  const [pillTimeInput, setPillTimeInput] = useState(nowHM());
   const today = todayISO();
 
   useEffect(() => {
     (async () => {
       try {
-        const [e, c] = await Promise.all([
+        const [e, c, pl] = await Promise.all([
           api(`/entries/${today}`).catch(() => null),
           api("/cycles"),
+          api("/pills/log").catch(() => null),
         ]);
         setEntry(e);
         setCycles(c || []);
+        setPillLog(pl);
       } catch {
         /* ignore */
       }
@@ -170,14 +175,72 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {onPills && (
+      {onPills && pillLog && pillLog.needs_log && (
+        <div className="pill-card">
+          <div className="pc-head">
+            <span className="pc-ico">
+              <Icon name="pill" size={20} />
+            </span>
+            <div className="pc-hd">
+              <b>Tabletka dzisiaj</b>
+              <span className="pc-sub">Zwykła pora: {pillLog.expected_time}</span>
+            </div>
+          </div>
+          {pillLog.taken ? (
+            <>
+              <div className={`pc-status ${pillLog.late ? "late" : "ok"}`}>
+                <Icon name={pillLog.late ? "zap" : "check"} size={16} />
+                {pillLog.late
+                  ? `Wzięta spóźniona o ${pillLog.taken_at}`
+                  : `Wzięta o ${pillLog.taken_at}`}
+              </div>
+              {pillLog.warning && (
+                <div className="pc-warn">
+                  <Icon name="info" size={15} />
+                  <span>{pillLog.warning}</span>
+                </div>
+              )}
+              <div className="pc-actions">
+                <button className="pc-undo" onClick={undoPill}>
+                  Cofnij
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="pc-log">
+              <input
+                type="time"
+                className="pc-time"
+                value={pillTimeInput}
+                onChange={(e) => setPillTimeInput(e.target.value)}
+              />
+              <button className="btn small" onClick={logPill}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                  <Icon name="check" size={15} /> Wzięłam tabletkę
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {onPills && (!pillLog || !pillLog.needs_log) && (
         <div className="info-banner">
           <span className="ib-ico">
             <Icon name="pill" size={18} />
           </span>
           <div className="ib-text">
-            <b>Tryb tabletek</b> — brak owulacji i dni płodnych. Kolejny okres
-            przewidywany w przerwie między blistrami.
+            {pillLog && pillLog.day_type === "period" ? (
+              <>
+                <b>Przerwa od tabletek</b> — w trakcie przerwy nie przyjmujesz
+                tabletki. Kolejny blister zacznij po jej zakończeniu.
+              </>
+            ) : (
+              <>
+                <b>Tryb tabletek</b> — brak owulacji i dni płodnych. Kolejny
+                okres przewidywany w przerwie między blistrami.
+              </>
+            )}
           </div>
         </div>
       )}
@@ -236,7 +299,11 @@ export default function Dashboard() {
         <div className="te-mood">{moodToday ? moodToday.emoji : "🌱"}</div>
         <div className="te-body">
           <div className="te-title">
-            {moodToday ? `Nastrój: ${moodToday.label}` : "Brak wpisu na dziś"}
+            {entry
+              ? moodToday
+                ? `Nastrój: ${moodToday.label}`
+                : "Wpis zapisany"
+              : "Brak wpisu na dziś"}
           </div>
           <div className="te-sub">
             {entry
@@ -270,5 +337,27 @@ export default function Dashboard() {
     if (currentPeriod) return;
     await addPeriod(today, undefined, 1);
     reload();
+  }
+
+  async function logPill() {
+    try {
+      const pl = await api("/pills/log", {
+        method: "POST",
+        body: { time: pillTimeInput },
+      });
+      setPillLog(pl);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function undoPill() {
+    try {
+      const pl = await api("/pills/log", { method: "DELETE", body: {} });
+      setPillLog(pl);
+      setPillTimeInput(nowHM());
+    } catch {
+      /* ignore */
+    }
   }
 }

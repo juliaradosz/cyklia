@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     pill_cycle_days INTEGER DEFAULT 21,
     pill_break_days INTEGER DEFAULT 7,
     pill_name TEXT,
+    pill_time TEXT DEFAULT '12:00',
     created_at TEXT NOT NULL
 );
 
@@ -44,6 +45,16 @@ CREATE TABLE IF NOT EXISTS entries (
     stress INTEGER,
     mucus TEXT,
     weight REAL,
+    UNIQUE (user_id, date),
+    FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS pill_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    taken_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
     UNIQUE (user_id, date),
     FOREIGN KEY (user_id) REFERENCES users (id)
 );
@@ -128,6 +139,7 @@ MIGRATIONS = [
     ("ALTER TABLE users ADD COLUMN pill_cycle_days INTEGER DEFAULT 21", "pill_cycle_days"),
     ("ALTER TABLE users ADD COLUMN pill_break_days INTEGER DEFAULT 7", "pill_break_days"),
     ("ALTER TABLE users ADD COLUMN pill_name TEXT", "pill_name"),
+    ("ALTER TABLE users ADD COLUMN pill_time TEXT DEFAULT '12:00'", "pill_time"),
     # rozszerzone pola dziennika (entries)
     ("ALTER TABLE entries ADD COLUMN libido TEXT", "libido"),
     ("ALTER TABLE entries ADD COLUMN stress INTEGER", "stress"),
@@ -172,7 +184,7 @@ def migrate(conn=None):
     acols = {r["name"] for r in conn.execute("PRAGMA table_info(articles)")}
     mcols = {r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)")}
     for sql, col in MIGRATIONS:
-        if col in {"pill_mode", "pill_cycle_days", "pill_break_days", "pill_name"}:
+        if col in {"pill_mode", "pill_cycle_days", "pill_break_days", "pill_name", "pill_time"}:
             cols_set = cols
         elif col in {"libido", "stress", "mucus", "weight"}:
             cols_set = ecols

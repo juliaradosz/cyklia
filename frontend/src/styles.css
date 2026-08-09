@@ -707,6 +707,115 @@ select {
   font-weight: 700;
 }
 
+/* Tabletka — dzienny log */
+.pill-card {
+  background: var(--surface);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+  margin: 4px 0 14px;
+}
+.pc-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pc-ico {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: var(--grad-soft);
+  color: var(--pink-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pc-hd {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pc-hd b {
+  font-size: 15px;
+  color: var(--ink);
+}
+.pc-sub {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.pc-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.pc-status.ok {
+  background: var(--green-100);
+  color: var(--green);
+}
+.pc-status.late {
+  background: #fff3dc;
+  color: #9a6b00;
+}
+.pc-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff8ec;
+  border: 1px solid #f3dfae;
+  color: #8a5d00;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.pc-warn svg {
+  flex: none;
+  margin-top: 2px;
+}
+.pc-log {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.pc-time {
+  flex: none;
+  width: 96px;
+  padding: 11px 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface);
+  font-family: inherit;
+  text-align: center;
+}
+.pc-time:focus {
+  outline: none;
+  border-color: var(--pink-500);
+}
+.pc-actions {
+  margin-top: 10px;
+}
+.pc-undo {
+  border: none;
+  background: none;
+  color: var(--pink-600);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 2px;
+}
+
 /* Dzisiejszy wpis */
 .today-entry {
   display: flex;

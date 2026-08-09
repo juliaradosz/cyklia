@@ -84,6 +84,14 @@ def create_app():
         if "pill_name" in data:
             fields.append("pill_name = ?")
             args.append(str(data.get("pill_name") or ""))
+        if "pill_time" in data:
+            t = str(data.get("pill_time") or "12:00").strip()
+            try:
+                datetime.strptime(t, "%H:%M")
+            except ValueError:
+                t = "12:00"
+            fields.append("pill_time = ?")
+            args.append(t)
         if fields:
             args.append(user_id)
             db.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", tuple(args))
@@ -96,6 +104,56 @@ def create_app():
         import pills as pills_data
 
         return jsonify(pills_data.PILLS)
+
+    # ---------- Tabletki — dzienny log (czy wzięta i o której) ----------
+
+    @app.get("/api/pills/log")
+    @auth.auth_required
+    def get_pill_log(user_id):
+        day = request.args.get("date") or date.today().isoformat()
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Nieprawidłowa data"}), 400
+        return jsonify(_pill_status(user_id, day))
+
+    @app.post("/api/pills/log")
+    @auth.auth_required
+    def mark_pill_taken(user_id):
+        data = request.get_json(silent=True) or {}
+        day = data.get("date") or date.today().isoformat()
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Nieprawidłowa data"}), 400
+        taken_at = (data.get("time") or datetime.now().strftime("%H:%M")).strip()
+        try:
+            datetime.strptime(taken_at, "%H:%M")
+        except ValueError:
+            return jsonify({"error": "Podaj godzinę w formacie HH:MM"}), 400
+        if not _pill_status(user_id, day)["needs_log"]:
+            return jsonify({"error": "Dziś jest dzień przerwy — nie przyjmujesz tabletki."}), 400
+        db.execute(
+            "INSERT INTO pill_logs (user_id, date, taken_at, created_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(user_id, date) DO UPDATE SET taken_at = excluded.taken_at",
+            (user_id, day, taken_at, db.now_iso()),
+        )
+        return jsonify(_pill_status(user_id, day))
+
+    @app.delete("/api/pills/log")
+    @auth.auth_required
+    def unmark_pill(user_id):
+        data = request.get_json(silent=True) or {}
+        day = data.get("date") or date.today().isoformat()
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Nieprawidłowa data"}), 400
+        db.execute(
+            "DELETE FROM pill_logs WHERE user_id = ? AND date = ?", (user_id, day)
+        )
+        return jsonify(_pill_status(user_id, day))
 
     # ---------- Cykle (okresy) ----------
 
@@ -506,11 +564,76 @@ def create_app():
 def _user_payload(user_id):
     u = db.query_one(
         "SELECT id, email, display_name, cycle_length_default, period_length_default, "
-        "pill_mode, pill_cycle_days, pill_break_days, pill_name, created_at "
+        "pill_mode, pill_cycle_days, pill_break_days, pill_name, pill_time, created_at "
         "FROM users WHERE id = ?",
         (user_id,),
     )
     return u
+
+
+def _fmt_delay(minutes):
+    hours = minutes / 60.0
+    if hours == int(hours):
+        return f"{int(hours)} godz."
+    return f"ok. {hours:.1f}".replace(".", ",") + " godz."
+
+
+def _pill_status(user_id, day):
+    """Status tabletki na dany dzień: czy trzeba przyjąć, czy już wzięta, czy spóźniona."""
+    user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+    cycles = db.query(
+        "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
+    )
+    starts = [c["start_date"] for c in cycles]
+    ends = [c["end_date"] for c in cycles if c["end_date"]]
+    on_pills = bool(user["pill_mode"])
+    pred = cyc.build_calendar(
+        starts,
+        cycle_length=user["cycle_length_default"],
+        period_length=user["period_length_default"],
+        pills=on_pills,
+        pill_cycle=user["pill_cycle_days"] or 21,
+        pill_break=user["pill_break_days"] or 7,
+    )
+    day_type = cyc.day_type_for(day, starts, ends, pred) if on_pills else "normal"
+    needs_log = on_pills and day_type != "period"
+    log = db.query_one(
+        "SELECT * FROM pill_logs WHERE user_id = ? AND date = ?", (user_id, day)
+    )
+    expected = user["pill_time"] or "12:00"
+    threshold_h = 3 if (user["pill_break_days"] or 7) == 0 else 12
+    late = False
+    warning = None
+    taken_at = log["taken_at"] if log else None
+    if taken_at:
+        try:
+            eh, em = (int(x) for x in expected.split(":"))
+            th, tm = (int(x) for x in taken_at.split(":"))
+            delta_min = (th * 60 + tm) - (eh * 60 + em)
+            if delta_min < 0 and -delta_min > 6 * 60:
+                delta_min += 24 * 60
+            if delta_min > threshold_h * 60:
+                late = True
+        except (ValueError, AttributeError):
+            delta_min = 0
+        if late:
+            warning = (
+                f"Tabletka wzięta o {taken_at}, czyli {_fmt_delay(delta_min)} po zwykłej "
+                f"porze ({expected}). Możliwy spadek skuteczności — sprawdź ulotkę "
+                f"albo skonsultuj się z lekarzem."
+            )
+    return {
+        "date": day,
+        "on_pills": on_pills,
+        "day_type": day_type,
+        "needs_log": needs_log,
+        "taken": bool(log),
+        "taken_at": taken_at,
+        "expected_time": expected,
+        "threshold_hours": threshold_h,
+        "late": late,
+        "warning": warning,
+    }
 
 
 def _chat_context(user_id):

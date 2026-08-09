@@ -16,6 +16,7 @@ export default function ProfilePage() {
   const [pillName, setPillName] = useState(user?.pill_name || "");
   const [pillCycle, setPillCycle] = useState(user?.pill_cycle_days || 21);
   const [pillBreak, setPillBreak] = useState(user?.pill_break_days || 7);
+  const [pillTime, setPillTime] = useState(user?.pill_time || "12:00");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function ProfilePage() {
         pill_name: pillMode ? pillName : "",
         pill_cycle_days: pillMode ? Number(pillCycle) : 21,
         pill_break_days: pillMode ? Number(pillBreak) : 7,
+        pill_time: pillMode ? pillTime : "12:00",
         ...extra,
       },
     });
@@ -55,6 +57,7 @@ export default function ProfilePage() {
       pill_name: pillMode ? pillName : "",
       pill_cycle_days: pillMode ? Number(pillCycle) : 21,
       pill_break_days: pillMode ? Number(pillBreak) : 7,
+      pill_time: pillMode ? pillTime : "12:00",
       ...extra,
     });
     setSaved(true);
@@ -69,8 +72,8 @@ export default function ProfilePage() {
   const initial = (user?.display_name || user?.email || "?")[0] || "?";
   const pillSub = pillMode
     ? pillName
-      ? `${pillName} · schemat ${pillCycle}+${pillBreak}`
-      : `Schemat ${pillCycle}+${pillBreak}`
+      ? `${pillName} · schemat ${pillCycle}+${pillBreak} · ${pillTime}`
+      : `Schemat ${pillCycle}+${pillBreak} · ${pillTime}`
     : "Wyłączona";
 
   if (view === "cycle") {
@@ -183,6 +186,18 @@ export default function ProfilePage() {
                 />
               </div>
             </div>
+            <div className="field" style={{ marginTop: 12 }}>
+              <label>Zwykła pora przyjmowania</label>
+              <input
+                type="time"
+                value={pillTime}
+                onChange={(e) => setPillTime(e.target.value)}
+              />
+            </div>
+            <p className="muted" style={{ fontSize: 11 }}>
+              Cyklia ostrzeże Cię, jeśli tabletkę przyjmiesz znacznie później
+              niż o tej porze.
+            </p>
             <p className="muted" style={{ fontSize: 11 }}>
               Schematy: 21+7, 24+4, 26+2 albo 28+0 (bez przerwy). Sprawdź
               zawsze ulotkę — lista ma charakter informacyjny.
