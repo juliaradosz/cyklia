@@ -2494,7 +2494,7 @@ select {
 .dash-bg {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
   background:
     linear-gradient(
@@ -2503,6 +2503,10 @@ select {
       rgba(255, 238, 246, 0.35) 100%
     ),
     url("/background.jpg") center / cover no-repeat;
+}
+.dash > :not(.dash-bg) {
+  position: relative;
+  z-index: 1;
 }
 
 .dash-hero {
