@@ -3297,19 +3297,19 @@ select {
 .dash-pill,
 .ds-b-ico,
 .cat-nav-btn {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(8px) saturate(1.5);
+  -webkit-backdrop-filter: blur(8px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   box-shadow: 0 10px 30px rgba(94, 38, 66, 0.14);
 }
 
 .for-you,
 .cat-hero {
-  background: linear-gradient(135deg, rgba(255, 225, 238, 0.55), rgba(243, 199, 221, 0.45));
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: linear-gradient(135deg, rgba(255, 225, 238, 0.35), rgba(243, 199, 221, 0.3));
+  backdrop-filter: blur(8px) saturate(1.5);
+  -webkit-backdrop-filter: blur(8px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .mood-opt,
@@ -3320,9 +3320,9 @@ select {
 .symptom-pill,
 .mood-btn,
 .st-btn {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(16px) saturate(1.4);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
 }
 
 .field input,
@@ -3331,18 +3331,33 @@ select {
 .vital-field select,
 .vital-field input,
 .sheet-input {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-color: rgba(255, 255, 255, 0.65);
 }
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.65);
 }
 
 .bottom-nav {
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.inspo-tile {
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(8px) saturate(1.4);
+  -webkit-backdrop-filter: blur(8px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 8px 22px rgba(94, 38, 66, 0.18);
+  color: #fff;
+}
+.tile-0,
+.tile-1,
+.tile-2,
+.tile-3 {
+  background: rgba(255, 255, 255, 0.28);
 }
 
