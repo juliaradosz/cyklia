@@ -96,13 +96,24 @@ CREATE TABLE IF NOT EXISTS comments (
     FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+CREATE TABLE IF NOT EXISTS chat_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT DEFAULT 'Nowa rozmowa',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
 CREATE TABLE IF NOT EXISTS chat_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
+    session_id INTEGER,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users (id)
+    FOREIGN KEY (user_id) REFERENCES users (id),
+    FOREIGN KEY (session_id) REFERENCES chat_sessions (id)
 );
 """
 
@@ -132,6 +143,8 @@ MIGRATIONS = [
     ("ALTER TABLE articles ADD COLUMN phase TEXT DEFAULT 'any'", "phase"),
     ("ALTER TABLE articles ADD COLUMN keywords TEXT DEFAULT ''", "keywords"),
     ("ALTER TABLE articles ADD COLUMN related TEXT DEFAULT '[]'", "related"),
+    # rozmowy czatu (osobne sesje)
+    ("ALTER TABLE chat_messages ADD COLUMN session_id INTEGER", "session_id"),
 ]
 
 
@@ -157,11 +170,14 @@ def migrate(conn=None):
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
     ecols = {r["name"] for r in conn.execute("PRAGMA table_info(entries)")}
     acols = {r["name"] for r in conn.execute("PRAGMA table_info(articles)")}
+    mcols = {r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)")}
     for sql, col in MIGRATIONS:
         if col in {"pill_mode", "pill_cycle_days", "pill_break_days", "pill_name"}:
             cols_set = cols
         elif col in {"libido", "stress", "mucus", "weight"}:
             cols_set = ecols
+        elif col == "session_id":
+            cols_set = mcols
         else:
             cols_set = acols
         if col not in cols_set:

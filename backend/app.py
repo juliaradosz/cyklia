@@ -368,44 +368,124 @@ def create_app():
             out.append(m)
         return jsonify(out)
 
-    # ---------- Czat ----------
+    # ---------- Czat (rozmowy) ----------
 
-    @app.get("/api/chat/history")
+    @app.get("/api/chat/sessions")
     @auth.auth_required
-    def chat_history(user_id):
+    def chat_sessions(user_id):
+        _ensure_chat_sessions(user_id)
         rows = db.query(
-            "SELECT role, content FROM chat_messages WHERE user_id = ? "
-            "ORDER BY id DESC LIMIT 50",
+            "SELECT s.id, s.title, s.created_at, s.updated_at, "
+            "(SELECT COUNT(*) FROM chat_messages m WHERE m.session_id = s.id) AS msg_count, "
+            "(SELECT content FROM chat_messages m WHERE m.session_id = s.id "
+            "ORDER BY m.id DESC LIMIT 1) AS last_message "
+            "FROM chat_sessions s WHERE s.user_id = ? ORDER BY s.updated_at DESC",
             (user_id,),
         )
-        rows.reverse()
         return jsonify(rows)
 
-    @app.post("/api/chat")
+    @app.post("/api/chat/sessions")
     @auth.auth_required
-    def chat(user_id):
+    def create_chat_session(user_id):
+        data = request.get_json(silent=True) or {}
+        title = (data.get("title") or "").strip() or "Nowa rozmowa"
+        now = db.now_iso()
+        sid = db.execute(
+            "INSERT INTO chat_sessions (user_id, title, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?)",
+            (user_id, title, now, now),
+        )
+        welcome = (
+            "Cześć! Jestem Twoim darmowym asystentem Cyklia. 🙂 Znam Twój "
+            "kalendarz, więc mogę powiedzieć np. kiedy przewiduję Twój kolejny "
+            "okres. O czym chcesz porozmawiać?"
+        )
+        db.execute(
+            "INSERT INTO chat_messages (user_id, session_id, role, content, created_at) "
+            "VALUES (?, ?, 'assistant', ?, ?)",
+            (user_id, sid, welcome, now),
+        )
+        return jsonify({
+            "id": sid, "title": title, "created_at": now, "updated_at": now,
+            "msg_count": 1, "last_message": welcome,
+        }), 201
+
+    @app.get("/api/chat/sessions/<int:sid>")
+    @auth.auth_required
+    def chat_session_messages(user_id, sid):
+        sess = _get_chat_session(user_id, sid)
+        if not sess:
+            return jsonify({"error": "Nie znaleziono rozmowy"}), 404
+        rows = db.query(
+            "SELECT role, content FROM chat_messages WHERE session_id = ? "
+            "ORDER BY id ASC LIMIT 200",
+            (sid,),
+        )
+        return jsonify({"id": sid, "title": sess["title"], "messages": rows})
+
+    @app.post("/api/chat/sessions/<int:sid>")
+    @auth.auth_required
+    def chat_session_send(user_id, sid):
+        sess = _get_chat_session(user_id, sid)
+        if not sess:
+            return jsonify({"error": "Nie znaleziono rozmowy"}), 404
         data = request.get_json(silent=True) or {}
         message = (data.get("message") or "").strip()
         if not message:
             return jsonify({"error": "Wiadomość nie może być pusta"}), 400
+        if sess["title"] == "Nowa rozmowa":
+            user_msgs = db.query_one(
+                "SELECT COUNT(*) AS c FROM chat_messages WHERE session_id = ? AND role = 'user'",
+                (sid,),
+            )
+            if not user_msgs["c"]:
+                title = message if len(message) <= 42 else message[:42] + "…"
+                db.execute("UPDATE chat_sessions SET title = ? WHERE id = ?", (title, sid))
         history = [
             {"role": m["role"], "content": m["content"]}
             for m in db.query(
-                "SELECT role, content FROM chat_messages WHERE user_id = ? ORDER BY id DESC LIMIT 10",
-                (user_id,),
+                "SELECT role, content FROM chat_messages WHERE session_id = ? "
+                "ORDER BY id DESC LIMIT 10",
+                (sid,),
             )
         ]
         history.reverse()
         answer = chat_reply(message, history, _chat_context(user_id))
+        now = db.now_iso()
         db.execute(
-            "INSERT INTO chat_messages (user_id, role, content, created_at) VALUES (?, 'user', ?, ?)",
-            (user_id, message, db.now_iso()),
+            "INSERT INTO chat_messages (user_id, session_id, role, content, created_at) "
+            "VALUES (?, ?, 'user', ?, ?)",
+            (user_id, sid, message, now),
         )
         db.execute(
-            "INSERT INTO chat_messages (user_id, role, content, created_at) VALUES (?, 'assistant', ?, ?)",
-            (user_id, answer, db.now_iso()),
+            "INSERT INTO chat_messages (user_id, session_id, role, content, created_at) "
+            "VALUES (?, ?, 'assistant', ?, ?)",
+            (user_id, sid, answer, now),
         )
+        db.execute("UPDATE chat_sessions SET updated_at = ? WHERE id = ?", (now, sid))
         return jsonify({"reply": answer})
+
+    @app.patch("/api/chat/sessions/<int:sid>")
+    @auth.auth_required
+    def rename_chat_session(user_id, sid):
+        sess = _get_chat_session(user_id, sid)
+        if not sess:
+            return jsonify({"error": "Nie znaleziono rozmowy"}), 404
+        data = request.get_json(silent=True) or {}
+        title = (data.get("title") or "").strip()
+        if title:
+            db.execute("UPDATE chat_sessions SET title = ? WHERE id = ?", (title, sid))
+        return jsonify({"ok": True})
+
+    @app.delete("/api/chat/sessions/<int:sid>")
+    @auth.auth_required
+    def delete_chat_session(user_id, sid):
+        sess = _get_chat_session(user_id, sid)
+        if not sess:
+            return jsonify({"error": "Nie znaleziono rozmowy"}), 404
+        db.execute("DELETE FROM chat_messages WHERE session_id = ?", (sid,))
+        db.execute("DELETE FROM chat_sessions WHERE id = ? AND user_id = ?", (sid, user_id))
+        return jsonify({"ok": True})
 
     # ---------- Serwowanie frontendu (po zbudowaniu) ----------
 
@@ -519,6 +599,43 @@ def _saved_ids(user_id):
         "SELECT article_id FROM user_articles WHERE user_id = ?", (user_id,)
     )
     return {r["article_id"] for r in rows}
+
+
+def _get_chat_session(user_id, sid):
+    return db.query_one(
+        "SELECT id, title FROM chat_sessions WHERE id = ? AND user_id = ?",
+        (sid, user_id),
+    )
+
+
+def _ensure_chat_sessions(user_id):
+    """Przenosi stare wiadomości (bez sesji) do istniejącej lub nowej sesji."""
+    legacy = db.query(
+        "SELECT id FROM chat_messages WHERE user_id = ? AND session_id IS NULL "
+        "ORDER BY id",
+        (user_id,),
+    )
+    if not legacy:
+        return
+    sess = db.query_one(
+        "SELECT id FROM chat_sessions WHERE user_id = ? "
+        "ORDER BY updated_at DESC LIMIT 1",
+        (user_id,),
+    )
+    if not sess:
+        now = db.now_iso()
+        db.execute(
+            "INSERT INTO chat_sessions (user_id, title, created_at, updated_at) "
+            "VALUES (?, 'Rozmowa 1', ?, ?)",
+            (user_id, now, now),
+        )
+        sess = db.query_one(
+            "SELECT id FROM chat_sessions WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            (user_id,),
+        )
+    for m in legacy:
+        db.execute("UPDATE chat_messages SET session_id = ? WHERE id = ?", (sess["id"], m["id"]))
+    db.execute("UPDATE chat_sessions SET updated_at = ? WHERE id = ?", (db.now_iso(), sess["id"]))
 
 
 app = create_app()
