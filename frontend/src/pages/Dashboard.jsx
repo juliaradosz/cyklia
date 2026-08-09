@@ -10,6 +10,7 @@ import {
 } from "../utils.js";
 import { api } from "../api/client.js";
 import { useEffect, useState } from "react";
+import Icon from "../components/Icon.jsx";
 
 export default function Dashboard() {
   const { data, reload } = useCalendar();
@@ -52,13 +53,8 @@ export default function Dashboard() {
   }
 
   let countdown = null;
-  let countdownLabel = "";
   if (pred.next_period_start) {
-    const diff = daysBetween(today, pred.next_period_start);
-    countdown = diff;
-    if (diff > 0) countdownLabel = "dni do okresu";
-    else if (diff === 0) countdownLabel = "okres — dziś";
-    else countdownLabel = "po terminie";
+    countdown = daysBetween(today, pred.next_period_start);
   }
 
   let cycleDay = null;
@@ -72,132 +68,207 @@ export default function Dashboard() {
   }
 
   const fertileToday =
-    !onPills && pred.has_data && today >= pred.fertile_start && today <= pred.fertile_end;
+    !onPills &&
+    pred.has_data &&
+    today >= pred.fertile_start &&
+    today <= pred.fertile_end;
   const ovulationToday = !onPills && pred.has_data && pred.ovulation_date === today;
 
   const moodToday = entry?.mood ? MOODS.find((m) => m.key === entry.mood) : null;
+  const symptomList = (() => {
+    try {
+      return entry?.symptoms ? JSON.parse(entry.symptoms) : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  let phaseChip = "Dzień cyklu";
+  if (todayType === "period") phaseChip = "Okres";
+  else if (onPills) phaseChip = "Tabletki";
+  else if (todayType === "ovulation") phaseChip = "Owulacja";
+  else if (todayType === "fertile") phaseChip = "Dni płodne";
+
+  let heroBig, heroSub, heroNote;
+  if (periodDay) {
+    heroBig = (
+      <>
+        Dzień {periodDay}
+        <small>.</small>
+      </>
+    );
+    heroSub = "okresu";
+    heroNote = `Koniec ok. ${shortPL(periodEnd)}`;
+  } else if (cycleDay) {
+    heroBig = (
+      <>
+        Dzień {cycleDay}
+        <small>.</small>
+      </>
+    );
+    heroSub = "cyklu";
+    heroNote =
+      countdown !== null
+        ? countdown > 0
+          ? `${countdown} dni do okresu`
+          : countdown === 0
+          ? "okres — dziś!"
+          : `${-countdown} dni po terminie`
+        : onPills
+        ? "Cykl w trybie tabletek"
+        : "";
+  } else {
+    heroBig = (
+      <>
+        —
+      </>
+    );
+    heroSub = "zacznij śledzenie";
+    heroNote = "Dodaj pierwszy okres w kalendarzu, by zobaczyć prognozy";
+  }
+
+  const stats = [
+    {
+      n: `${pred.cycle_length}`,
+      l: "dni cyklu",
+    },
+    onPills
+      ? {
+          n: countdown !== null ? `${Math.max(countdown, 0)}` : "—",
+          l:
+            countdown !== null && countdown <= 0
+              ? "okres — dziś"
+              : "dni do okresu",
+        }
+      : {
+          n: pred.ovulation_date ? shortPL(pred.ovulation_date) : "—",
+          l: "owulacja",
+        },
+    {
+      n: onPills ? "—" : countdown !== null ? `${Math.max(countdown, 0)}` : "—",
+      l: onPills ? "bez owulacji" : "dni do okresu",
+    },
+  ];
+
+  return (
+    <div>
+      <div className="hero">
+        <div className="hero-top">
+          <span className="hero-date">Dziś · {formatPL(today)}</span>
+          <span className="hero-chip">{phaseChip}</span>
+        </div>
+        <div className="hero-big">{heroBig}</div>
+        <div className="hero-sub">{heroSub}</div>
+        {heroNote && <div className="hero-note">{heroNote}</div>}
+        <div className="hero-stats">
+          {stats.map((s, i) => (
+            <div key={i} className="hero-stat">
+              <div className="n">{s.n}</div>
+              <div className="l">{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {onPills && (
+        <div className="info-banner">
+          <span className="ib-ico">
+            <Icon name="pill" size={18} />
+          </span>
+          <div className="ib-text">
+            <b>Tryb tabletek</b> — brak owulacji i dni płodnych. Kolejny okres
+            przewidywany w przerwie między blistrami.
+          </div>
+        </div>
+      )}
+
+      <div className="quick-actions">
+        <button className="qa" onClick={() => navigate("/dziennik")}>
+          <span className="qa-ico">
+            <Icon name="pen" size={22} />
+          </span>
+          <span className="qa-lbl">Dodaj wpis</span>
+        </button>
+        <button className="qa" onClick={() => navigate("/dziennik")}>
+          <span className="qa-ico">
+            <Icon name="heart" size={22} />
+          </span>
+          <span className="qa-lbl">Objawy</span>
+        </button>
+        <button className="qa" onClick={() => navigate("/kalendarz")}>
+          <span className="qa-ico">
+            <Icon name="calendar" size={22} />
+          </span>
+          <span className="qa-lbl">Kalendarz</span>
+        </button>
+      </div>
+
+      {(ovulationToday || fertileToday || todayType === "period") && (
+        <div className="spread mb" style={{ marginTop: 4 }}>
+          {todayType === "period" && (
+            <span className="status-pill pink">
+              <span className="dot" /> Okres
+            </span>
+          )}
+          {ovulationToday && (
+            <span className="status-pill mauve">
+              <span className="dot" /> Owulacja — dziś!
+            </span>
+          )}
+          {fertileToday && !ovulationToday && (
+            <span className="status-pill green">
+              <span className="dot" /> Jesteś w oknie płodnym
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="section-head">
+        <h2>Dzisiejszy wpis</h2>
+        {entry && (
+          <Link to="/dziennik" className="more">
+            Edytuj
+          </Link>
+        )}
+      </div>
+
+      <div className="today-entry">
+        <div className="te-mood">{moodToday ? moodToday.emoji : "🌱"}</div>
+        <div className="te-body">
+          <div className="te-title">
+            {moodToday ? `Nastrój: ${moodToday.label}` : "Brak wpisu na dziś"}
+          </div>
+          <div className="te-sub">
+            {entry
+              ? [entry.temperature ? `${entry.temperature}°C` : null]
+                  .filter(Boolean)
+                  .concat(symptomList.slice(0, 3))
+                  .join(" · ") || "Dodaj szczegóły dnia"
+              : "Zapisz nastrój, objawy i temperaturę w dzienniku"}
+          </div>
+        </div>
+        <button
+          className="te-cta"
+          onClick={() => navigate("/dziennik")}
+          aria-label="Przejdź do dziennika"
+        >
+          <Icon name="chevron-right" size={20} />
+        </button>
+      </div>
+
+      {!currentPeriod && (
+        <button className="btn ghost block" onClick={logPeriodToday}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Icon name="calendar" size={17} /> Zaznacz początek okresu
+          </span>
+        </button>
+      )}
+    </div>
+  );
 
   async function logPeriodToday() {
     if (currentPeriod) return;
     await addPeriod(today, undefined, 1);
     reload();
   }
-
-  return (
-    <div>
-      <div className="hero">
-        <div className="label">Dziś · {formatPL(today)}</div>
-        {periodDay ? (
-          <>
-            <div className="big">Dzień {periodDay}</div>
-            <div className="label">
-              okresu · koniec ok. {shortPL(periodEnd)}
-            </div>
-          </>
-        ) : cycleDay ? (
-          <>
-            <div className="big">Dzień {cycleDay}</div>
-            <div className="label">
-              cyklu{onPills ? " (tabletki)" : ""} ·{" "}
-              {countdown !== null
-                ? countdown > 0
-                  ? `${countdown} dni do okresu`
-                  : countdown === 0
-                  ? "okres — dziś!"
-                  : `${-countdown} dni po terminie`
-                : ""}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="big">—</div>
-            <div className="label">
-              Dodaj pierwszy okres w kalendarzu, by zobaczyć prognozy
-            </div>
-          </>
-        )}
-        <div className="stats-line">
-          <span>Cykl: {pred.cycle_length} dni</span>
-          <span>
-            {onPills
-              ? "Owulacja: brak (tabletki)"
-              : `Owulacja: ${
-                  pred.ovulation_date ? shortPL(pred.ovulation_date) : "—"
-                }`}
-          </span>
-        </div>
-      </div>
-
-      {onPills && (
-        <div className="banner">
-          💊 Tryb tabletek antykoncepcyjnych — nie ma owulacji ani dni
-          płodnych. Kolejny okres przewidywany w przerwie między blistrami.
-        </div>
-      )}
-
-      <div className="spread mb">
-        <div className="day-chip">
-          {todayType === "period"
-            ? "🩸 Okres"
-            : onPills
-            ? "💊 Dzień przyjmowania"
-            : todayType === "ovulation"
-            ? "🥚 Owulacja"
-            : todayType === "fertile"
-            ? "🌱 Dni płodne"
-            : "🌸 Dzień cyklu"}
-        </div>
-        {ovulationToday && <div className="day-chip">🥚 Owulacja — dziś!</div>}
-        {fertileToday && !ovulationToday && (
-          <div className="day-chip">🌱 Jesteś w oknie płodnym</div>
-        )}
-      </div>
-
-      <div className="card">
-        <h2>Dzisiejszy wpis</h2>
-        {moodToday ? (
-          <div className="row">
-            <span>
-              {moodToday.emoji} Nastrój: {moodToday.label}
-            </span>
-            <Link to="/dziennik" className="btn small ghost">
-              Edytuj
-            </Link>
-          </div>
-        ) : (
-          <p className="muted">
-            Brak wpisu na dziś. Zapisz nastrój i objawy w dzienniku.
-          </p>
-        )}
-        <div className="spread mt">
-          {!currentPeriod && (
-            <button className="btn ghost" onClick={logPeriodToday}>
-              🩸 Zaznacz okres
-            </button>
-          )}
-          <button className="btn" onClick={() => navigate("/dziennik")}>
-            📝 Wpisz dzisiaj
-          </button>
-        </div>
-      </div>
-
-      <div className="card">
-        <h2>Szybkie skróty</h2>
-        <div className="spread">
-          <Link to="/kalendarz" className="btn small ghost">
-            📅 Kalendarz
-          </Link>
-          <Link to="/statystyki" className="btn small ghost">
-            📊 Statystyki
-          </Link>
-          <Link to="/czat" className="btn small ghost">
-            💬 Zapytaj asystenta
-          </Link>
-          <Link to="/inspiracje" className="btn small ghost">
-            📖 Inspiracje
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
 }

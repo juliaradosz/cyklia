@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../api/auth.jsx";
+import Icon from "../components/Icon.jsx";
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -32,7 +33,9 @@ export default function RegisterPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-logo">
-        <div className="flower">🌸</div>
+        <div className="flower">
+          <Icon name="flower" size={42} strokeWidth={2} />
+        </div>
         <h1>Cyklia</h1>
         <p>Dołącz — obserwuj cykl, zdrowie i samopoczucie</p>
       </div>

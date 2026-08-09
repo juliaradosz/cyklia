@@ -1,25 +1,36 @@
 import { NavLink, Outlet, Link } from "react-router-dom";
 import { useAuth } from "../api/auth.jsx";
+import Icon from "./Icon.jsx";
 
 const NAV = [
-  { to: "/", end: true, icon: "🌸", label: "Start" },
-  { to: "/kalendarz", icon: "📅", label: "Kalendarz" },
-  { to: "/dziennik", icon: "📝", label: "Dziennik" },
-  { to: "/czat", icon: "💬", label: "Asystent" },
-  { to: "/profil", icon: "👤", label: "Profil" },
+  { to: "/", end: true, icon: "home", label: "Start" },
+  { to: "/kalendarz", icon: "calendar", label: "Kalendarz" },
+  { to: "/dziennik", icon: "journal", label: "Dziennik" },
+  { to: "/czat", icon: "sparkles", label: "Asystent" },
+  { to: "/profil", icon: "user", label: "Profil" },
 ];
 
 export default function Layout() {
   const { user } = useAuth();
+  const first = (user?.display_name || user?.email || "?")[0] || "?";
+
   return (
     <>
       <div className="top-bar">
-        <Link to="/" className="logo">
-          🌸 Cyklia
+        <Link to="/" className="brand">
+          <span className="brand-mark">
+            <Icon name="flower" size={18} strokeWidth={2.2} />
+          </span>
+          Cyklia
         </Link>
-        <NavLink to="/profil" className="tag" style={{ textDecoration: "none" }}>
-          {(user?.display_name || user?.email || "").split("@")[0]}
-        </NavLink>
+        <div className="top-actions">
+          <Link to="/inspiracje" className="icon-btn" aria-label="Inspiracje">
+            <Icon name="book" size={20} />
+          </Link>
+          <NavLink to="/profil" className="avatar" aria-label="Profil">
+            {first}
+          </NavLink>
+        </div>
       </div>
       <main className="page">
         <Outlet />
@@ -30,9 +41,11 @@ export default function Layout() {
             key={n.to}
             to={n.to}
             end={n.end}
-            className={({ isActive }) => (isActive ? "active" : "")}
+            className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
           >
-            <span className="nav-ico">{n.icon}</span>
+            <span className="nav-ico">
+              <Icon name={n.icon} size={21} />
+            </span>
             {n.label}
           </NavLink>
         ))}

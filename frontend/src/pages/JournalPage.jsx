@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import {
   todayISO,
+  addDays,
   formatPL,
-  shortPL,
   MOODS,
   SYMPTOMS,
   LIBIDO,
   MUCUS,
 } from "../utils.js";
+import Icon from "../components/Icon.jsx";
 
 const EMPTY = {
   temperature: "",
@@ -24,12 +26,31 @@ const EMPTY = {
   weight: "",
 };
 
+const POPULAR_SYMPTOMS = [
+  "Ból brzucha",
+  "Ból piersi",
+  "Ból głowy",
+  "Ból pleców",
+  "Wzdęcia",
+  "Trądzik",
+  "Mdłości",
+  "Zachcianki na słodkie",
+  "Niepokój",
+  "Płaczliwość",
+  "Zmęczenie",
+  "Trudności z koncentracją",
+];
+
 export default function JournalPage() {
-  const [date, setDate] = useState(todayISO());
+  const [params, setParams] = useSearchParams();
+  const today = todayISO();
+  const initDate = params.get("date") || today;
+  const [date, setDate] = useState(initDate);
   const [form, setForm] = useState(EMPTY);
   const [entries, setEntries] = useState([]);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [showAllSymptoms, setShowAllSymptoms] = useState(false);
 
   async function loadList() {
     try {
@@ -42,6 +63,7 @@ export default function JournalPage() {
 
   async function loadEntry(day) {
     setDate(day);
+    setParams(day === today ? {} : { date: day }, { replace: true });
     try {
       const e = await api(`/entries/${day}`);
       if (e) {
@@ -67,7 +89,7 @@ export default function JournalPage() {
   }
 
   useEffect(() => {
-    loadEntry(date);
+    loadEntry(initDate);
     loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -102,7 +124,7 @@ export default function JournalPage() {
         },
       });
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      setTimeout(() => setSaved(false), 2200);
       await loadList();
     } finally {
       setBusy(false);
@@ -113,97 +135,120 @@ export default function JournalPage() {
     return MOODS.find((m) => m.key === key)?.emoji || "🙂";
   }
 
+  const symptomsToShow = showAllSymptoms
+    ? SYMPTOMS
+    : POPULAR_SYMPTOMS.filter((s) => SYMPTOMS.includes(s));
+  const hasMore = symptomsToShow.length < SYMPTOMS.length;
+
+  function prevDay() {
+    loadEntry(addDays(date, -1));
+  }
+  function nextDay() {
+    if (date < today) loadEntry(addDays(date, 1));
+  }
+
   return (
     <div>
       <div className="page-header">
         <div>
           <h1>Dziennik</h1>
-          <div className="sub">Objawy, nastrój, temperatura i samopoczucie</div>
+          <div className="sub">Twój codzienny check-in</div>
         </div>
       </div>
 
+      <div className="date-nav">
+        <button
+          className="icon-btn"
+          onClick={prevDay}
+          aria-label="Poprzedni dzień"
+        >
+          <Icon name="chevron-left" size={18} />
+        </button>
+        <div className="date-nav-mid">
+          <div className="date-nav-label">Wpis na</div>
+          <b>{formatPL(date)}</b>
+          {date !== today && (
+            <button className="date-nav-today" onClick={() => loadEntry(today)}>
+              Dziś
+            </button>
+          )}
+        </div>
+        <button
+          className={`icon-btn${date >= today ? " disabled" : ""}`}
+          onClick={nextDay}
+          aria-label="Następny dzień"
+        >
+          <Icon name="chevron-right" size={18} />
+        </button>
+      </div>
+
       <form onSubmit={save}>
-        <div className="card">
-          <div className="field">
-            <label>Data</label>
-            <input
-              type="date"
-              value={date}
-              max={todayISO()}
-              onChange={(e) => {
-                const d = e.target.value;
-                setDate(d);
-                loadEntry(d);
-              }}
-            />
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="sun" size={17} />
+            </span>
+            <b>Samopoczucie</b>
           </div>
-
-          <div className="spread">
-            <div className="field" style={{ flex: 1 }}>
-              <label>Temperatura bazowa (°C)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="35"
-                max="41"
-                value={form.temperature}
-                onChange={(e) =>
-                  setForm({ ...form, temperature: e.target.value })
-                }
-                placeholder="np. 36.60"
-              />
-            </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label>Waga (kg)</label>
-              <input
-                type="number"
-                step="0.1"
-                min="30"
-                max="200"
-                value={form.weight}
-                onChange={(e) => setForm({ ...form, weight: e.target.value })}
-                placeholder="np. 62.5"
-              />
-            </div>
+          <div className="mood-grid">
+            {MOODS.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                className={`mood-opt ${form.mood === m.key ? "on" : ""}`}
+                onClick={() => setForm({ ...form, mood: m.key })}
+              >
+                <span className="mo-emoji">{m.emoji}</span>
+                <span className="mo-label">{m.label}</span>
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div className="field">
-            <label>Nastrój</label>
-            <div className="mood-row">
-              {MOODS.map((m) => (
-                <button
-                  key={m.key}
-                  type="button"
-                  className={`mood-btn ${form.mood === m.key ? "on" : ""}`}
-                  onClick={() => setForm({ ...form, mood: m.key })}
-                >
-                  {m.emoji} {m.label}
-                </button>
-              ))}
-            </div>
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="heart" size={17} />
+            </span>
+            <b>Objawy</b>
           </div>
-
-          <div className="field">
-            <label>Objawy</label>
-            <div className="symptoms-grid">
-              {SYMPTOMS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`symptom-pill ${
-                    form.symptoms.includes(s) ? "on" : ""
-                  }`}
-                  onClick={() => toggleSymptom(s)}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+          <div className="symptoms-grid">
+            {symptomsToShow.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`symptom-chip ${
+                  form.symptoms.includes(s) ? "on" : ""
+                }`}
+                onClick={() => toggleSymptom(s)}
+              >
+                {s}
+              </button>
+            ))}
           </div>
+          {hasMore && (
+            <button
+              type="button"
+              className="show-more"
+              onClick={() => setShowAllSymptoms((v) => !v)}
+            >
+              {showAllSymptoms ? "Pokaż mniej" : "Pokaż więcej"}
+            </button>
+          )}
+        </div>
 
-          <div className="spread">
-            <div className="field" style={{ flex: 1 }}>
-              <label>Libido</label>
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="flame" size={17} />
+            </span>
+            <b>Ciało</b>
+          </div>
+          <div className="vital-grid">
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Libido
+              </label>
               <select
                 value={form.libido}
                 onChange={(e) => setForm({ ...form, libido: e.target.value })}
@@ -214,8 +259,10 @@ export default function JournalPage() {
                 ))}
               </select>
             </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label>Śluz szyjkowy</label>
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Śluz szyjkowy
+              </label>
               <select
                 value={form.mucus}
                 onChange={(e) => setForm({ ...form, mucus: e.target.value })}
@@ -226,11 +273,10 @@ export default function JournalPage() {
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="spread">
-            <div className="field" style={{ flex: 1 }}>
-              <label>Poziom stresu</label>
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Poziom stresu
+              </label>
               <select
                 value={form.stress}
                 onChange={(e) =>
@@ -245,8 +291,10 @@ export default function JournalPage() {
                 ))}
               </select>
             </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label>Sen (godziny)</label>
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Sen (godziny)
+              </label>
               <input
                 type="number"
                 step="0.5"
@@ -257,26 +305,41 @@ export default function JournalPage() {
                 placeholder="np. 7.5"
               />
             </div>
-          </div>
-
-          <div className="spread">
-            <div className="field" style={{ flex: 1 }}>
-              <label>Woda (szklanki)</label>
-              <select
-                value={form.water}
-                onChange={(e) =>
-                  setForm({ ...form, water: Number(e.target.value) })
-                }
-              >
-                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Woda (szklanki)
+              </label>
+              <div className="stepper">
+                <span className="st-label">szkl.</span>
+                <div className="st-controls">
+                  <button
+                    type="button"
+                    className="st-btn"
+                    onClick={() =>
+                      setForm({ ...form, water: Math.max(0, (form.water || 0) - 1) })
+                    }
+                    aria-label="Mniej"
+                  >
+                    −
+                  </button>
+                  <span className="st-value">{form.water || 0}</span>
+                  <button
+                    type="button"
+                    className="st-btn"
+                    onClick={() =>
+                      setForm({ ...form, water: Math.min(10, (form.water || 0) + 1) })
+                    }
+                    aria-label="Więcej"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
             </div>
-            <div className="field" style={{ flex: 1 }}>
-              <label>Aktywność (min)</label>
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Aktywność (min)
+              </label>
               <input
                 type="number"
                 min="0"
@@ -289,32 +352,84 @@ export default function JournalPage() {
               />
             </div>
           </div>
+        </div>
 
-          <div className="field">
-            <label>Notatki</label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              placeholder="Jak się czujesz? Co Cię cieszyło lub męczyło?"
-            />
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="thermometer" size={17} />
+            </span>
+            <b>Temperatura i waga</b>
           </div>
+          <div className="vital-grid">
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Temperatura bazowa (°C)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="35"
+                max="41"
+                value={form.temperature}
+                onChange={(e) =>
+                  setForm({ ...form, temperature: e.target.value })
+                }
+                placeholder="np. 36.60"
+              />
+            </div>
+            <div className="vital-field">
+              <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)", marginBottom: 6, display: "block" }}>
+                Waga (kg)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="30"
+                max="200"
+                value={form.weight}
+                onChange={(e) => setForm({ ...form, weight: e.target.value })}
+                placeholder="np. 62.5"
+              />
+            </div>
+          </div>
+        </div>
 
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="pen" size={17} />
+            </span>
+            <b>Notatka</b>
+          </div>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            placeholder="Jak się czujesz? Co Cię cieszyło lub męczyło?"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 14, padding: 13, width: "100%", minHeight: 84, outline: "none", fontSize: 14 }}
+          />
+        </div>
+
+        <div className="j-sticky">
           <button className="btn block" disabled={busy}>
-            {saved ? "✓ Wpis zapisany!" : busy ? "Zapisywanie…" : "Zapisz wpis"}
+            {busy
+              ? "Zapisywanie…"
+              : saved
+              ? "Zapisano ✓"
+              : `Zapisz wpis · ${formatPL(date).split(",")[1] || date}`}
           </button>
-          {saved && (
-            <p className="center muted mt" style={{ fontSize: 12, color: "#3f8f5a" }}>
-              Wpis dla dnia {formatPL(date)} został zapisany. Możesz go edytować
-              wybierając datę lub klikając „Edytuj" na liście poniżej.
-            </p>
-          )}
+          {saved && <div className="j-saved-note">Wpis zapisany. Dziękuję! 💗</div>}
         </div>
       </form>
 
-      <div className="card">
+      <div className="section-head">
         <h2>Zapisane wpisy</h2>
+      </div>
+      <div className="card" style={{ padding: "6px 18px" }}>
         {entries.length === 0 && (
-          <p className="muted">Brak zapisanych wpisów. Dodaj pierwszy powyżej!</p>
+          <p className="muted" style={{ padding: "12px 0" }}>
+            Brak zapisanych wpisów. Dodaj pierwszy powyżej!
+          </p>
         )}
         {entries.map((e) => {
           const syms = (() => {
@@ -325,29 +440,27 @@ export default function JournalPage() {
             }
           })();
           return (
-            <div key={e.date} className="row mb">
+            <div key={e.date} className="entry-row">
               <div style={{ minWidth: 0 }}>
-                <b style={{ fontSize: 14 }}>{formatPL(e.date)}</b>
-                <div className="muted" style={{ fontSize: 12 }}>
+                <div className="er-date">{formatPL(e.date)}</div>
+                <div className="er-sub">
                   {moodEmoji(e.mood)} {e.mood || "brak nastroju"}
                   {e.temperature ? ` · ${e.temperature}°C` : ""}
                   {syms.length ? ` · ${syms.slice(0, 3).join(", ")}` : ""}
                 </div>
               </div>
               <button
-                className="btn small ghost"
+                className="icon-btn er-edit"
+                style={{ width: 34, height: 34 }}
                 onClick={() => loadEntry(e.date)}
+                aria-label="Edytuj wpis"
               >
-                Edytuj
+                <Icon name="pen" size={15} />
               </button>
             </div>
           );
         })}
       </div>
-
-      <p className="muted center" style={{ fontSize: 12 }}>
-        Data wpisu: {formatPL(date)}
-      </p>
     </div>
   );
 }

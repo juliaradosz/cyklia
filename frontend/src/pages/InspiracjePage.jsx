@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useCalendar } from "../hooks.js";
+import Icon from "../components/Icon.jsx";
 import {
   CATEGORY_ORDER,
   categoryMeta,
@@ -119,7 +120,9 @@ export default function InspiracjePage() {
       </div>
 
       <div className="search-wrap">
-        <span className="search-ico">🔍</span>
+        <span className="search-ico">
+          <Icon name="search" size={18} />
+        </span>
         <input
           className="search-input"
           placeholder="Czego chcesz się dowiedzieć?"
@@ -128,7 +131,7 @@ export default function InspiracjePage() {
         />
         {query && (
           <button className="search-clear" onClick={() => setQuery("")}>
-            ✕
+            <Icon name="x" size={14} />
           </button>
         )}
       </div>
@@ -149,7 +152,9 @@ export default function InspiracjePage() {
           {savedList.length > 0 && (
             <section className="insp-section">
               <div className="cat-head">
-                <span className="cat-emoji">♥</span>
+                <span className="cat-emoji" style={{ background: "var(--surface-2)" }}>
+                  <Icon name="heart" size={20} style={{ color: "var(--pink-600)" }} />
+                </span>
                 <div>
                   <h2>Zapisane</h2>
                   <div className="cat-tagline">Twoje ulubione artykuły</div>

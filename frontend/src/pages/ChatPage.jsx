@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client.js";
 import { formatPL } from "../utils.js";
+import { useAuth } from "../api/auth.jsx";
+import Icon from "../components/Icon.jsx";
 
 const PROMPTS = [
   "Kiedy mam okres?",
@@ -11,7 +13,15 @@ const PROMPTS = [
   "Jak mierzyć temperaturę?",
 ];
 
+const SUGGESTIONS = [
+  { icon: "calendar", text: "Kiedy przewidujesz mój kolejny okres?" },
+  { icon: "heart", text: "Co oznaczają moje ostatnie objawy?" },
+  { icon: "repeat", text: "Podsumuj mój ostatni cykl" },
+  { icon: "sun", text: "Jak łagodzić PMS?" },
+];
+
 export default function ChatPage() {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState([]);
   const [current, setCurrent] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -132,6 +142,7 @@ export default function ChatPage() {
   if (loading) return <div className="center-screen">Ładowanie…</div>;
 
   const currentSession = sessions.find((s) => s.id === current) || null;
+  const showIntro = messages.length <= 1;
 
   if (view === "list") {
     return (
@@ -144,7 +155,9 @@ export default function ChatPage() {
         </div>
 
         <button className="btn block mb" onClick={newConversation}>
-          ＋ Nowa rozmowa
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Icon name="plus" size={18} /> Nowa rozmowa
+          </span>
         </button>
 
         {sessions.length === 0 && (
@@ -162,23 +175,31 @@ export default function ChatPage() {
                 className="chat-list-main"
                 onClick={() => openSession(s.id)}
               >
-                <div className="chat-list-title">
-                  {s.title === "Nowa rozmowa" ? "💬 Nowa rozmowa" : `💬 ${s.title}`}
-                </div>
-                <div className="chat-list-snippet">
-                  {s.last_message || "Brak wiadomości"}
-                </div>
-                <div className="chat-list-meta">
-                  {formatPL(s.updated_at.slice(0, 10))} · {s.msg_count}{" "}
-                  {s.msg_count === 1 ? "wiadomość" : "wiadomości"}
-                </div>
+                <span className="cl-avatar">
+                  <Icon name="sparkles" size={20} />
+                </span>
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span className="chat-list-title">
+                    {s.title === "Nowa rozmowa" ? "Nowa rozmowa" : s.title}
+                  </span>
+                  <span className="chat-list-snippet">
+                    {s.last_message || "Brak wiadomości"}
+                  </span>
+                  <span className="chat-list-meta">
+                    {formatPL(s.updated_at.slice(0, 10))} · {s.msg_count}{" "}
+                    {s.msg_count === 1 ? "wiadomość" : "wiadomości"}
+                  </span>
+                </span>
+                <span className="chat-list-go">
+                  <Icon name="chevron-right" size={18} />
+                </span>
               </button>
               <button
                 className="chat-list-del"
                 onClick={() => removeSession(s.id)}
                 aria-label="Usuń rozmowę"
               >
-                🗑
+                <Icon name="trash" size={18} />
               </button>
             </div>
           ))}
@@ -190,36 +211,70 @@ export default function ChatPage() {
   return (
     <div>
       <div className="chat-view-head">
-        <button className="chat-back" onClick={() => { setView("list"); refreshSessions(); }} aria-label="Lista rozmów">
-          ←
-        </button>
-        <div className="chat-title">
-          {currentSession?.title || "Rozmowa"}
-        </div>
         <button
-          className="chat-del"
+          className="icon-btn"
+          onClick={() => {
+            setView("list");
+            refreshSessions();
+          }}
+          aria-label="Lista rozmów"
+        >
+          <Icon name="chevron-left" size={20} />
+        </button>
+        <div className="chat-title">{currentSession?.title || "Rozmowa"}</div>
+        <button
+          className="icon-btn"
+          style={{ color: "var(--ink-3)" }}
           onClick={() => removeSession(current)}
           aria-label="Usuń rozmowę"
         >
-          🗑
+          <Icon name="trash" size={18} />
         </button>
       </div>
 
-      <div className="chips mb">
-        {PROMPTS.map((p) => (
-          <button key={p} className="chip" onClick={() => send(p)}>
-            {p}
-          </button>
-        ))}
-      </div>
+      {showIntro && (
+        <>
+          <div className="welcome-card">
+            <span className="wc-ico">
+              <Icon name="sparkles" size={22} />
+            </span>
+            <h3>Hej, {user?.display_name || "piękna"} 👋</h3>
+            <p>
+              Jestem asystentem Cyklii. Mogę korzystać z danych Twojego cyklu,
+              żeby odpowiadać bardziej konkretnie.
+            </p>
+          </div>
+
+          <div className="sug-grid">
+            {SUGGESTIONS.map((s) => (
+              <button
+                key={s.text}
+                className="sug-card"
+                onClick={() => send(s.text)}
+              >
+                <span className="sg-ico">
+                  <Icon name={s.icon} size={17} />
+                </span>
+                <span>{s.text}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="chat-box">
         {messages.map((m, i) => (
-          <div key={i} className={`bubble ${m.role}`}>
+          <div key={i} className={`bubble ${m.role === "user" ? "user" : "bot"}`}>
             {m.content}
           </div>
         ))}
-        {busy && <div className="typing">Asystent pisze…</div>}
+        {busy && (
+          <div className="typing">
+            <i />
+            <i />
+            <i />
+          </div>
+        )}
         <div ref={bottom} />
       </div>
 
@@ -231,8 +286,8 @@ export default function ChatPage() {
           placeholder="Zadaj pytanie…"
           disabled={busy}
         />
-        <button onClick={() => send()} disabled={busy}>
-          ➤
+        <button onClick={() => send()} disabled={busy} aria-label="Wyślij">
+          <Icon name="send" size={19} />
         </button>
       </div>
     </div>
