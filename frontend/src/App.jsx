@@ -10,7 +10,6 @@ import StatsPage from "./pages/StatsPage.jsx";
 import ChatPage from "./pages/ChatPage.jsx";
 import ArticlesPage from "./pages/ArticlesPage.jsx";
 import ArticlePage from "./pages/ArticlePage.jsx";
-import CommunityPage from "./pages/CommunityPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 
 function Protected({ children }) {
@@ -41,7 +40,6 @@ export default function App() {
         <Route path="czat" element={<ChatPage />} />
         <Route path="artykuly" element={<ArticlesPage />} />
         <Route path="artykuly/:id" element={<ArticlePage />} />
-        <Route path="spolecznosc" element={<CommunityPage />} />
         <Route path="profil" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

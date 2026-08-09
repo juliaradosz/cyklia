@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client.js";
 
-const SUGGESTIONS = [
-  "Co to jest owulacja?",
-  "Mam objawy PMS, co pomaga?",
-  "Jak mierzyć temperaturę bazową?",
+const PROMPTS = [
+  "Kiedy mam okres?",
+  "Kiedy mam owulację?",
   "Kiedy są moje dni płodne?",
+  "Który to dzień mojego cyklu?",
+  "Co pomaga na PMS?",
+  "Jak mierzyć temperaturę?",
 ];
 
 export default function ChatPage() {
@@ -13,7 +15,7 @@ export default function ChatPage() {
     {
       role: "assistant",
       content:
-        "Cześć! Jestem Twoim darmowym asystentem Cyklia. 🙂 Pytaj o cykl, owulację, PMS, temperaturę, sen i zdrowie. To informacje edukacyjne — nie zastępują wizyty u lekarza.",
+        "Cześć! Jestem Twoim darmowym asystentem Cyklia. 🙂 Znam Twój kalendarz, więc mogę powiedzieć np. kiedy przewiduję Twój kolejny okres. Kliknij podpowiedź albo napisz własne pytanie.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -63,6 +65,14 @@ export default function ChatPage() {
         </div>
       </div>
 
+      <div className="chips mb">
+        {PROMPTS.map((p) => (
+          <button key={p} className="chip" onClick={() => send(p)}>
+            {p}
+          </button>
+        ))}
+      </div>
+
       <div className="chat-box">
         {messages.map((m, i) => (
           <div key={i} className={`bubble ${m.role}`}>
@@ -72,16 +82,6 @@ export default function ChatPage() {
         {busy && <div className="typing">Asystent pisze…</div>}
         <div ref={bottom} />
       </div>
-
-      {messages.length <= 1 && (
-        <div className="chips mb">
-          {SUGGESTIONS.map((s) => (
-            <button key={s} className="chip" onClick={() => send(s)}>
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
 
       <div className="chat-input">
         <input

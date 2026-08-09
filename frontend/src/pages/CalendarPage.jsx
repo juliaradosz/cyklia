@@ -78,7 +78,14 @@ export default function CalendarPage() {
         <div>
           <h1>Kalendarz</h1>
           <div className="sub">
-            {pred.has_data ? (
+            {pred.on_pills ? (
+              <>
+                Tryb tabletek — okres przewidywany w przerwie:{" "}
+                {pred.next_period_start
+                  ? formatPL(pred.next_period_start)
+                  : "dodaj pierwszy okres"}
+              </>
+            ) : pred.has_data ? (
               <>
                 Kolejny okres:{" "}
                 {pred.next_period_start
@@ -125,8 +132,15 @@ export default function CalendarPage() {
         </div>
         <div className="legend">
           <span className="l-period">okres</span>
-          <span className="l-fertile">dni płodne</span>
-          <span className="l-ovulation">owulacja</span>
+          {!pred.on_pills && (
+            <>
+              <span className="l-fertile">dni płodne</span>
+              <span className="l-ovulation">owulacja</span>
+            </>
+          )}
+          {pred.on_pills && (
+            <span style={{ fontSize: 12 }}>💊 brak owulacji i dni płodnych</span>
+          )}
         </div>
       </div>
 

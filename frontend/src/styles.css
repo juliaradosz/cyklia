@@ -601,34 +601,6 @@ textarea {
   color: var(--pink-dark);
 }
 
-/* ---------- Społeczność ---------- */
-.post-card {
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 14px 16px;
-  margin-bottom: 12px;
-}
-.post-card .meta {
-  font-size: 12px;
-  color: var(--muted);
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.post-card h3 {
-  margin: 8px 0 6px;
-}
-.comment {
-  border-top: 1px solid var(--line);
-  padding: 10px 0;
-}
-.comment .who {
-  font-size: 12px;
-  color: var(--muted);
-}
-
 /* ---------- Pomocnicze ---------- */
 .center-screen {
   min-height: 100dvh;
@@ -700,4 +672,15 @@ textarea {
   gap: 6px;
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.banner {
+  background: #fff3e0;
+  border: 1px solid #ffe0b2;
+  color: #8a5a1a;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 14px;
 }

@@ -72,10 +72,30 @@ def create_app():
             if key in data and isinstance(data[key], int) and 14 <= data[key] <= 60:
                 fields.append(f"{key} = ?")
                 args.append(data[key])
+        if "pill_mode" in data:
+            fields.append("pill_mode = ?")
+            args.append(1 if data["pill_mode"] else 0)
+        if "pill_cycle_days" in data and isinstance(data["pill_cycle_days"], int):
+            fields.append("pill_cycle_days = ?")
+            args.append(max(1, min(30, data["pill_cycle_days"])))
+        if "pill_break_days" in data and isinstance(data["pill_break_days"], int):
+            fields.append("pill_break_days = ?")
+            args.append(max(0, min(14, data["pill_break_days"])))
+        if "pill_name" in data:
+            fields.append("pill_name = ?")
+            args.append(str(data.get("pill_name") or ""))
         if fields:
             args.append(user_id)
             db.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", tuple(args))
         return jsonify(_user_payload(user_id))
+
+    # ---------- Antykoncepcja (informacyjna baza tabletek) ----------
+
+    @app.get("/api/pills")
+    def list_pills():
+        import pills as pills_data
+
+        return jsonify(pills_data.PILLS)
 
     # ---------- Cykle (okresy) ----------
 
@@ -161,23 +181,31 @@ def create_app():
             "water": data.get("water"),
             "sleep": data.get("sleep"),
             "activity": data.get("activity"),
+            "libido": data.get("libido"),
+            "stress": data.get("stress"),
+            "mucus": data.get("mucus"),
+            "weight": data.get("weight"),
         }
         if existing:
             db.execute(
                 "UPDATE entries SET temperature=?, mood=?, symptoms=?, notes=?, "
-                "water=?, sleep=?, activity=? WHERE id=?",
+                "water=?, sleep=?, activity=?, libido=?, stress=?, mucus=?, weight=? "
+                "WHERE id=?",
                 (
                     vals["temperature"], vals["mood"], vals["symptoms"], vals["notes"],
-                    vals["water"], vals["sleep"], vals["activity"], existing["id"],
+                    vals["water"], vals["sleep"], vals["activity"], vals["libido"],
+                    vals["stress"], vals["mucus"], vals["weight"], existing["id"],
                 ),
             )
         else:
             db.execute(
                 "INSERT INTO entries (user_id, date, temperature, mood, symptoms, notes, "
-                "water, sleep, activity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "water, sleep, activity, libido, stress, mucus, weight) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     user_id, day, vals["temperature"], vals["mood"], vals["symptoms"],
                     vals["notes"], vals["water"], vals["sleep"], vals["activity"],
+                    vals["libido"], vals["stress"], vals["mucus"], vals["weight"],
                 ),
             )
         return jsonify(db.query_one("SELECT * FROM entries WHERE user_id = ? AND date = ?", (user_id, day)))
@@ -203,6 +231,9 @@ def create_app():
             starts,
             cycle_length=user["cycle_length_default"],
             period_length=user["period_length_default"],
+            pills=bool(user["pill_mode"]),
+            pill_cycle=user["pill_cycle_days"] or 21,
+            pill_break=user["pill_break_days"] or 7,
         )
         # zakres widoczny: od pierwszego wpisu do +90 dni w przyszłość
         min_day = min(starts) if starts else date.today().isoformat()
@@ -279,69 +310,6 @@ def create_app():
             return jsonify({"error": "Nie znaleziono artykułu"}), 404
         return jsonify(row)
 
-    # ---------- Społeczność / forum ----------
-
-    @app.get("/api/posts")
-    def list_posts():
-        rows = db.query(
-            """SELECT p.id, p.category, p.title, p.body, p.created_at,
-                      u.display_name AS author,
-                      (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count
-               FROM posts p JOIN users u ON u.id = p.user_id
-               ORDER BY p.created_at DESC"""
-        )
-        return jsonify(rows)
-
-    @app.post("/api/posts")
-    @auth.auth_required
-    def add_post(user_id):
-        data = request.get_json(silent=True) or {}
-        title = (data.get("title") or "").strip()
-        body = (data.get("body") or "").strip()
-        category = (data.get("category") or "").strip() or "Ogólne"
-        if not title or not body:
-            return jsonify({"error": "Tytuł i treść są wymagane"}), 400
-        pid = db.execute(
-            "INSERT INTO posts (user_id, category, title, body, created_at) VALUES (?, ?, ?, ?, ?)",
-            (user_id, category, title, body, db.now_iso()),
-        )
-        row = db.query_one(
-            """SELECT p.id, p.category, p.title, p.body, p.created_at,
-                      u.display_name AS author,
-                      (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count
-               FROM posts p JOIN users u ON u.id = p.user_id WHERE p.id = ?""",
-            (pid,),
-        )
-        return jsonify(row), 201
-
-    @app.get("/api/posts/<int:pid>/comments")
-    def list_comments(pid):
-        rows = db.query(
-            """SELECT c.id, c.body, c.created_at, u.display_name AS author
-               FROM comments c JOIN users u ON u.id = c.user_id
-               WHERE c.post_id = ? ORDER BY c.created_at""",
-            (pid,),
-        )
-        return jsonify(rows)
-
-    @app.post("/api/posts/<int:pid>/comments")
-    @auth.auth_required
-    def add_comment(user_id, pid):
-        data = request.get_json(silent=True) or {}
-        body = (data.get("body") or "").strip()
-        if not body:
-            return jsonify({"error": "Komentarz nie może być pusty"}), 400
-        cid = db.execute(
-            "INSERT INTO comments (post_id, user_id, body, created_at) VALUES (?, ?, ?, ?)",
-            (pid, user_id, body, db.now_iso()),
-        )
-        row = db.query_one(
-            """SELECT c.id, c.body, c.created_at, u.display_name AS author
-               FROM comments c JOIN users u ON u.id = c.user_id WHERE c.id = ?""",
-            (cid,),
-        )
-        return jsonify(row), 201
-
     # ---------- Czat ----------
 
     @app.get("/api/chat/history")
@@ -370,7 +338,7 @@ def create_app():
             )
         ]
         history.reverse()
-        answer = chat_reply(message, history)
+        answer = chat_reply(message, history, _chat_context(user_id))
         db.execute(
             "INSERT INTO chat_messages (user_id, role, content, created_at) VALUES (?, 'user', ?, ?)",
             (user_id, message, db.now_iso()),
@@ -387,6 +355,8 @@ def create_app():
         @app.get("/", defaults={"path": ""})
         @app.get("/<path:path>")
         def spa(path):
+            if path.startswith("api/"):
+                return jsonify({"error": "Nie znaleziono zasobu"}), 404
             full = os.path.normpath(os.path.join(DIST_DIR, path))
             if path and full.startswith(DIST_DIR) and os.path.isfile(full):
                 return app.send_static_file(path)
@@ -399,11 +369,56 @@ def create_app():
 
 def _user_payload(user_id):
     u = db.query_one(
-        "SELECT id, email, display_name, cycle_length_default, period_length_default, created_at "
+        "SELECT id, email, display_name, cycle_length_default, period_length_default, "
+        "pill_mode, pill_cycle_days, pill_break_days, pill_name, created_at "
         "FROM users WHERE id = ?",
         (user_id,),
     )
     return u
+
+
+def _chat_context(user_id):
+    """Buduje kontekst z kalendarza użytkownika, by asystent mógł podać konkretne daty."""
+    from datetime import timedelta
+
+    cycles = db.query(
+        "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
+    )
+    user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+    starts = [c["start_date"] for c in cycles]
+    pred = cyc.build_calendar(
+        starts,
+        cycle_length=user["cycle_length_default"],
+        period_length=user["period_length_default"],
+        pills=bool(user["pill_mode"]),
+        pill_cycle=user["pill_cycle_days"] or 21,
+        pill_break=user["pill_break_days"] or 7,
+    )
+    today = date.today()
+    cycle_day = None
+    if starts:
+        last_start = datetime.strptime(starts[-1], "%Y-%m-%d").date()
+        if last_start <= today:
+            cycle_day = (today - last_start).days + 1
+    days_to_period = None
+    if pred.get("next_period_start"):
+        nxt = datetime.strptime(pred["next_period_start"], "%Y-%m-%d").date()
+        days_to_period = (nxt - today).days
+    today_type = None
+    if starts or pred.get("on_pills"):
+        ends = [c["end_date"] for c in cycles if c["end_date"]]
+        today_type = cyc.day_type_for(today.isoformat(), starts, ends, pred)
+    return {
+        "on_pills": bool(user["pill_mode"]),
+        "next_period_start": pred.get("next_period_start"),
+        "ovulation_date": pred.get("ovulation_date"),
+        "fertile_start": pred.get("fertile_start"),
+        "fertile_end": pred.get("fertile_end"),
+        "cycle_length": pred.get("cycle_length"),
+        "cycle_day": cycle_day,
+        "days_to_period": days_to_period,
+        "today_type": today_type,
+    }
 
 
 def _to_json_list(value):

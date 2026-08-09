@@ -22,19 +22,62 @@ def average_cycle_length(start_dates, default=28):
     return default
 
 
-def build_calendar(start_dates, cycle_length=None, period_length=None):
-    """Zwraca prognozę na podstawie listy dat rozpoczęcia okresów."""
+def build_calendar(
+    start_dates,
+    cycle_length=None,
+    period_length=None,
+    pills=False,
+    pill_cycle=21,
+    pill_break=7,
+):
+    """Zwraca prognozę na podstawie listy dat rozpoczęcia okresów.
+
+    pills=True → tryb antykoncepcji hormonalnej: brak owulacji i dni płodnych,
+    kolejna miesiączka przewidywana w przerwie między blistrami.
+    """
     start_dates = sorted(set(parse_date(s) if isinstance(s, str) else s for s in start_dates))
+
+    if pills:
+        total = max(int(pill_cycle), 1) + max(int(pill_break), 0)
+        if not start_dates:
+            return {
+                "has_data": False,
+                "on_pills": True,
+                "next_period_start": None,
+                "ovulation_date": None,
+                "fertile_start": None,
+                "fertile_end": None,
+                "cycle_length": total,
+                "pill_break_days": int(pill_break),
+            }
+        last = start_dates[-1]
+        next_start = last + timedelta(days=total)
+        today = date.today()
+        while next_start <= today:
+            next_start += timedelta(days=total)
+        return {
+            "has_data": True,
+            "on_pills": True,
+            "next_period_start": iso(next_start),
+            "ovulation_date": None,
+            "fertile_start": None,
+            "fertile_end": None,
+            "cycle_length": total,
+            "pill_break_days": int(pill_break),
+        }
+
     cycle = cycle_length or average_cycle_length(start_dates)
 
     if not start_dates:
         return {
             "has_data": False,
+            "on_pills": False,
             "next_period_start": None,
             "ovulation_date": None,
             "fertile_start": None,
             "fertile_end": None,
             "cycle_length": cycle,
+            "pill_break_days": None,
         }
 
     last = start_dates[-1]
@@ -50,11 +93,13 @@ def build_calendar(start_dates, cycle_length=None, period_length=None):
 
     return {
         "has_data": True,
+        "on_pills": False,
         "next_period_start": iso(next_start),
         "ovulation_date": iso(ovulation),
         "fertile_start": iso(fertile_start),
         "fertile_end": iso(fertile_end),
         "cycle_length": cycle,
+        "pill_break_days": None,
     }
 
 
@@ -63,8 +108,6 @@ def day_type_for(day, cycle_starts, period_end_dates, prediction):
     day = parse_date(day)
     for s in cycle_starts:
         s = parse_date(s)
-        e = None
-        # okres trwa domyślnie 5 dni, chyba że podano koniec
         matching_end = next(
             (parse_date(x) for x in period_end_dates if parse_date(x) >= s),
             None,
@@ -73,7 +116,19 @@ def day_type_for(day, cycle_starts, period_end_dates, prediction):
         if s <= day <= e:
             return "period"
 
-    if prediction.get("has_data"):
+    if prediction.get("on_pills"):
+        # przy tabletkach brak owulacji/dni płodnych; ewentualny okres
+        # przewidywany jest w przerwie między blistrami
+        nxt = prediction.get("next_period_start")
+        brk = prediction.get("pill_break_days") or 7
+        if nxt:
+            p = parse_date(nxt)
+            p_end = p + timedelta(days=brk - 1)
+            if p <= day <= p_end:
+                return "period"
+        return "normal"
+
+    if prediction.get("has_data") and prediction.get("ovulation_date"):
         ov = parse_date(prediction["ovulation_date"])
         fs = parse_date(prediction["fertile_start"])
         fe = parse_date(prediction["fertile_end"])

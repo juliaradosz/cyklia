@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS users (
     display_name TEXT,
     cycle_length_default INTEGER DEFAULT 28,
     period_length_default INTEGER DEFAULT 5,
+    pill_mode INTEGER DEFAULT 0,
+    pill_cycle_days INTEGER DEFAULT 21,
+    pill_break_days INTEGER DEFAULT 7,
+    pill_name TEXT,
     created_at TEXT NOT NULL
 );
 
@@ -36,6 +40,10 @@ CREATE TABLE IF NOT EXISTS entries (
     water INTEGER,
     sleep REAL,
     activity INTEGER,
+    libido TEXT,
+    stress INTEGER,
+    mucus TEXT,
+    weight REAL,
     UNIQUE (user_id, date),
     FOREIGN KEY (user_id) REFERENCES users (id)
 );
@@ -84,6 +92,20 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+MIGRATIONS = [
+    # tryb tabletek antykoncepcyjnych (users)
+    ("ALTER TABLE users ADD COLUMN pill_mode INTEGER DEFAULT 0", "pill_mode"),
+    ("ALTER TABLE users ADD COLUMN pill_cycle_days INTEGER DEFAULT 21", "pill_cycle_days"),
+    ("ALTER TABLE users ADD COLUMN pill_break_days INTEGER DEFAULT 7", "pill_break_days"),
+    ("ALTER TABLE users ADD COLUMN pill_name TEXT", "pill_name"),
+    # rozszerzone pola dziennika (entries)
+    ("ALTER TABLE entries ADD COLUMN libido TEXT", "libido"),
+    ("ALTER TABLE entries ADD COLUMN stress INTEGER", "stress"),
+    ("ALTER TABLE entries ADD COLUMN mucus TEXT", "mucus"),
+    ("ALTER TABLE entries ADD COLUMN weight REAL", "weight"),
+]
+
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -94,8 +116,27 @@ def get_db():
 def init_db():
     conn = get_db()
     conn.executescript(SCHEMA)
+    migrate(conn)
     conn.commit()
     conn.close()
+
+
+def migrate(conn=None):
+    own = conn is None
+    if own:
+        conn = get_db()
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+    ecols = {r["name"] for r in conn.execute("PRAGMA table_info(entries)")}
+    for sql, col in MIGRATIONS:
+        table = "users" if col in [
+            "pill_mode", "pill_cycle_days", "pill_break_days", "pill_name"
+        ] else "entries"
+        cols_set = cols if table == "users" else ecols
+        if col not in cols_set:
+            conn.execute(sql)
+    if own:
+        conn.commit()
+        conn.close()
 
 
 def query(sql, args=()):

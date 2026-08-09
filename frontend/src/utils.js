@@ -56,10 +56,19 @@ export const MOODS = [
   { key: "radosna", emoji: "😊", label: "Radosna" },
   { key: "spokojna", emoji: "😌", label: "Spokojna" },
   { key: "neutralna", emoji: "😐", label: "Neutralna" },
-  { key: "przygnębiona", emoji: "😔", label: "Przygnębiona" },
+  { key: "pobudzona", emoji: "🤩", label: "Pobudzona" },
+  { key: "energiczna", emoji: "⚡", label: "Energiczna" },
+  { key: "zakochana", emoji: "😍", label: "Zakochana" },
+  { key: "zrelaksowana", emoji: "🧘‍♀️", label: "Zrelaksowana" },
   { key: "zmęczona", emoji: "🥱", label: "Zmęczona" },
-  { key: "pobudzona", emoji: "😍", label: "Pobudzona" },
+  { key: "smutna", emoji: "😢", label: "Smutna" },
+  { key: "przygnębiona", emoji: "😔", label: "Przygnębiona" },
   { key: "drażliwa", emoji: "😠", label: "Drażliwa" },
+  { key: "zła", emoji: "😤", label: "Zła" },
+  { key: "lękowa", emoji: "😰", label: "Lękowa" },
+  { key: "spięta", emoji: "😬", label: "Spięta" },
+  { key: "płaczliwa", emoji: "😭", label: "Płaczliwa" },
+  { key: "bezsilna", emoji: "😩", label: "Bezsilna" },
 ];
 
 export const SYMPTOMS = [
@@ -67,12 +76,34 @@ export const SYMPTOMS = [
   "Ból pleców",
   "Ból piersi",
   "Ból głowy",
+  "Ból jajników",
   "Wzdęcia",
   "Mdłości",
   "Trądzik",
-  "Brak apetytu",
+  "Sucha skóra",
   "Zwiększony apetyt",
+  "Brak apetytu",
+  "Zachcianki na słodkie",
+  "Zgaga",
+  "Zaparcia",
+  "Biegunka",
   "Zawroty głowy",
-  "Wrażliwość emocjonalna",
+  "Kurcze nóg",
+  "Wrażliwość na światło",
+  "Trudności z koncentracją",
+  "Niepokój",
+  "Płaczliwość",
   "Bóle mięśni",
+  "Opuchnięte piersi",
+];
+
+export const LIBIDO = ["Niskie", "Średnie", "Wysokie"];
+
+export const MUCUS = [
+  "Brak / sucho",
+  "Kleisty",
+  "Kremowy",
+  "Wodnisty",
+  "Białko jajka",
+  "Krwisty",
 ];

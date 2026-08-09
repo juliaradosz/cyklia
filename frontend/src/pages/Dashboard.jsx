@@ -1,6 +1,13 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useCalendar, addPeriod } from "../hooks.js";
-import { todayISO, daysBetween, shortPL, formatPL, MOODS } from "../utils.js";
+import {
+  todayISO,
+  daysBetween,
+  addDays,
+  shortPL,
+  formatPL,
+  MOODS,
+} from "../utils.js";
 import { api } from "../api/client.js";
 import { useEffect, useState } from "react";
 
@@ -29,10 +36,20 @@ export default function Dashboard() {
   if (!data) return <div className="center-screen">Ładowanie…</div>;
 
   const pred = data.prediction;
+  const onPills = !!pred.on_pills;
   const todayType = data.days[today] || "normal";
+
   const currentPeriod = cycles.find(
     (c) => c.start_date <= today && (!c.end_date || c.end_date >= today)
   );
+
+  let periodDay = null;
+  let periodEnd = null;
+  if (currentPeriod) {
+    periodDay = daysBetween(currentPeriod.start_date, today) + 1;
+    periodEnd =
+      currentPeriod.end_date || addDays(currentPeriod.start_date, 4);
+  }
 
   let countdown = null;
   let countdownLabel = "";
@@ -44,13 +61,21 @@ export default function Dashboard() {
     else countdownLabel = "po terminie";
   }
 
-  const fertileToday =
-    today >= pred.fertile_start && today <= pred.fertile_end && pred.has_data;
-  const ovulationToday = pred.has_data && pred.ovulation_date === today;
-
-  const moodToday = entry?.mood
-    ? MOODS.find((m) => m.key === entry.mood)
+  let cycleDay = null;
+  const lastStart = cycles.length
+    ? [...cycles].sort((a, b) => a.start_date.localeCompare(b.start_date))[
+        cycles.length - 1
+      ].start_date
     : null;
+  if (lastStart && lastStart <= today) {
+    cycleDay = daysBetween(lastStart, today) + 1;
+  }
+
+  const fertileToday =
+    !onPills && pred.has_data && today >= pred.fertile_start && today <= pred.fertile_end;
+  const ovulationToday = !onPills && pred.has_data && pred.ovulation_date === today;
+
+  const moodToday = entry?.mood ? MOODS.find((m) => m.key === entry.mood) : null;
 
   async function logPeriodToday() {
     if (currentPeriod) return;
@@ -62,12 +87,26 @@ export default function Dashboard() {
     <div>
       <div className="hero">
         <div className="label">Dziś · {formatPL(today)}</div>
-        {countdown !== null ? (
+        {periodDay ? (
           <>
-            <div className="big">
-              {countdown > 0 ? `${countdown}` : countdown === 0 ? "Dziś!" : `${-countdown}`}
+            <div className="big">Dzień {periodDay}</div>
+            <div className="label">
+              okresu · koniec ok. {shortPL(periodEnd)}
             </div>
-            <div className="label">{countdownLabel}</div>
+          </>
+        ) : cycleDay ? (
+          <>
+            <div className="big">Dzień {cycleDay}</div>
+            <div className="label">
+              cyklu{onPills ? " (tabletki)" : ""} ·{" "}
+              {countdown !== null
+                ? countdown > 0
+                  ? `${countdown} dni do okresu`
+                  : countdown === 0
+                  ? "okres — dziś!"
+                  : `${-countdown} dni po terminie`
+                : ""}
+            </div>
           </>
         ) : (
           <>
@@ -78,20 +117,30 @@ export default function Dashboard() {
           </>
         )}
         <div className="stats-line">
+          <span>Cykl: {pred.cycle_length} dni</span>
           <span>
-            Cykl: {pred.cycle_length} dni
-          </span>
-          <span>
-            Owulacja:{" "}
-            {pred.ovulation_date ? shortPL(pred.ovulation_date) : "—"}
+            {onPills
+              ? "Owulacja: brak (tabletki)"
+              : `Owulacja: ${
+                  pred.ovulation_date ? shortPL(pred.ovulation_date) : "—"
+                }`}
           </span>
         </div>
       </div>
+
+      {onPills && (
+        <div className="banner">
+          💊 Tryb tabletek antykoncepcyjnych — nie ma owulacji ani dni
+          płodnych. Kolejny okres przewidywany w przerwie między blistrami.
+        </div>
+      )}
 
       <div className="spread mb">
         <div className="day-chip">
           {todayType === "period"
             ? "🩸 Okres"
+            : onPills
+            ? "💊 Dzień przyjmowania"
             : todayType === "ovulation"
             ? "🥚 Owulacja"
             : todayType === "fertile"

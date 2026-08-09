@@ -6,7 +6,7 @@ const NAV = [
   { to: "/kalendarz", icon: "📅", label: "Kalendarz" },
   { to: "/dziennik", icon: "📝", label: "Dziennik" },
   { to: "/czat", icon: "💬", label: "Asystent" },
-  { to: "/spolecznosc", icon: "👥", label: "Społecz." },
+  { to: "/profil", icon: "👤", label: "Profil" },
 ];
 
 export default function Layout() {

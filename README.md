@@ -8,12 +8,19 @@ głównego z Safari) z backendem w Pythonie/Flasku, przeznaczona do wdrożenia n
 
 - Konto użytkownika (rejestracja / logowanie, JWT) i synchronizacja w chmurze
 - Kalendarz cyklu z prognozą owulacji i dni płodnych (uczy się z Twoich wpisów)
-- Dziennik: nastrój, objawy, temperatura bazowa, sen, woda, aktywność, notatki
+- **Tryb tabletek antykoncepcyjnych**: wybierz swój środek (baza ~20 popularnych
+  tabletek) — kalendarz dopasowuje się: brak owulacji i dni płodnych, okres
+  przewidywany w przerwie między blistrami
+- Dashboard pokazujący **który to dzień okresu**, dzień cyklu i za ile dni
+  kolejny okres
+- Dziennik: 16 nastrojów, 23 objawy, temperatura bazowa, waga, libido, śluz
+  szyjkowy, poziom stresu, sen, woda, aktywność i notatki — z listą zapisanych
+  wpisów i możliwością edycji
 - Statystyki: średnia długość cyklu i okresu, wykres temperatury, nastroje, objawy
-- **Darmowy czat AI** (asystent działa lokalnie, bez płatnych API; można podpiąć
-  własny klucz do darmowych modeli — patrz niżej)
+- **Darmowy czat AI, bez limitu** — asystent zna Twój kalendarz i podaje
+  konkretne daty (kolejny okres, owulacja, dni płodne). Działa lokalnie, bez
+  płatnych API; można podpiąć własny klucz do darmowych modeli — patrz niżej
 - Artykuły edukacyjne o cyklu i zdrowiu
-- Społeczność (forum: posty i komentarze)
 - PWA — instalacja na telefonie, ikona na ekranie głównym
 
 ## Struktura
@@ -155,19 +162,36 @@ Na Androidzie/Chrome: menu ⋮ → **Dodaj do ekranu głównego**.
 ## Darmowy czat AI
 
 Domyślnie asystent odpowiada lokalnie (reguły) — **bez żadnych opłat i kluczy**.
-Jeśli chcesz jeszcze lepsze odpowiedzi, możesz podłączyć darmowy model przez
-dowolny endpoint OpenAI-compatible (np. darmowe modele na OpenRouter lub Groq).
+To nie jest jednak prawdziwa AI: zna tylko wcześniej przygotowane tematy
+(owulacja, PMS, bóle, temperatura, śluz, tabletki, nieregularne cykle itd.).
+Na pytania spoza tych tematów odpowiedź będzie ogólna.
 
-Ustaw zmienne środowiskowe w zakładce **Web → Environment variables**:
+Jeśli chcesz, żeby asystent odpowiadał **na dowolne pytanie** jak prawdziwa
+sztuczna inteligencja, podłącz darmowy model. Najprościej przez **Groq**
+(darmowy klucz na https://console.groq.com) — inne darmowe opcje: OpenRouter
+(`:free` modele), Google AI Studio (Gemini).
+
+### Lokalnie (Windows)
+Ustaw zmienne w systemie lub przed uruchomieniem:
 
 ```
-CYKLIA_LLM_API=https://openrouter.ai/api/v1/chat/completions
-CYKLIA_LLM_KEY=twoj_klucz
-CYKLIA_LLM_MODEL=meta-llama/llama-3.3-70b-instruct
+set CYKLIA_LLM_API=https://api.groq.com/openai/v1/chat/completions
+set CYKLIA_LLM_KEY=twoj_klucz_z_groq
+set CYKLIA_LLM_MODEL=llama-3.3-70b-versatile
 ```
 
-Bez tych zmiennych aplikacja i tak działa — lokalny asystent jest całkowicie
-wystarczający i darmowy.
+### Na PythonAnywhere
+W zakładce **Web → Environment variables** dodaj trzy zmienne:
+
+```
+CYKLIA_LLM_API=https://api.groq.com/openai/v1/chat/completions
+CYKLIA_LLM_KEY=twoj_klucz_z_groq
+CYKLIA_LLM_MODEL=llama-3.3-70b-versatile
+```
+
+potem kliknij **Reload**. Bez tych zmiennych aplikacja i tak działa — lokalny
+asystent jest całkowicie darmowy i zna Twój kalendarz (podaje daty okresu,
+owulacji, dzień cyklu).
 
 ## Bezpieczeństwo danych
 
