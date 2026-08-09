@@ -91,7 +91,7 @@ export default function CalendarPage() {
     if (view !== "month") return;
     const el = document.getElementById(`cal-month-${anchor.y}-${anchor.m}`);
     if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
-  }, [view, anchor]);
+  }, [view, anchor, data]);
 
   const periodDays = useMemo(
     () =>
