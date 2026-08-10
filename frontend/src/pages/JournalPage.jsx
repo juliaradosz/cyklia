@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useCalendar } from "../hooks.js";
@@ -18,6 +18,8 @@ import {
   PHASE_HINTS,
 } from "../utils.js";
 import Icon from "../components/Icon.jsx";
+
+const RETURN_KEY = "cyklia_cal_return";
 
 const EMPTY = {
   temperature: "",
@@ -80,6 +82,17 @@ export default function JournalPage() {
   const [pillTimeInput, setPillTimeInput] = useState(nowHM());
   const [cycles, setCycles] = useState([]);
   const { data: cal } = useCalendar();
+  const goBackToCalendarRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      // Jeśli wracamy do kalendarza, zostaw zapisany stan; w przeciwnym
+      // razie wyczyść go, żeby kalendarz otwierał się zawsze na dziś.
+      if (!goBackToCalendarRef.current) {
+        sessionStorage.removeItem(RETURN_KEY);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     api("/cycles")
@@ -233,7 +246,12 @@ export default function JournalPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2200);
       await loadList();
-      if (returnTo === "kalendarz") navigate("/kalendarz");
+      if (returnTo === "kalendarz") {
+        goBackToCalendarRef.current = true;
+        navigate("/kalendarz");
+      } else {
+        navigate("/");
+      }
     } finally {
       setBusy(false);
     }

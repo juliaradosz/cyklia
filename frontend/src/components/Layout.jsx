@@ -4,7 +4,6 @@ import Icon from "./Icon.jsx";
 const NAV = [
   { to: "/", end: true, icon: "home", label: "Start" },
   { to: "/dziennik", icon: "journal", label: "Dziennik" },
-  { to: "/statystyki", icon: "chart", label: "Statystyki" },
   { to: "/inspiracje", icon: "book", label: "Inspiracje" },
   { to: "/czat", icon: "sparkles", label: "Asystent" },
   { to: "/profil", icon: "user", label: "Profil" },

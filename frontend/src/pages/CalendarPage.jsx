@@ -58,6 +58,17 @@ export default function CalendarPage() {
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef(null);
   const restoreScrollRef = useRef(null);
+  const leavingToJournalRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      // Opuszczając kalendarz w dowolne inne miejsce (poza przejściem do
+      // dziennika) czyścimy zapisany stan — kolejne otwarcie zaczyna od dziś.
+      if (!leavingToJournalRef.current) {
+        sessionStorage.removeItem(RETURN_KEY);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -220,6 +231,7 @@ export default function CalendarPage() {
   function goAddSymptoms() {
     if (!selected) return;
     try {
+      leavingToJournalRef.current = true;
       sessionStorage.setItem(
         RETURN_KEY,
         JSON.stringify({

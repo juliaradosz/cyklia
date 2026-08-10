@@ -123,36 +123,49 @@ export default function Dashboard() {
     ? daysBetween(activeDay, pred.next_period_start)
     : null;
 
-  let phaseLabel = "Śledzenie";
-  if (activeType === "period") phaseLabel = "Okres";
-  else if (activeType === "ovulation") phaseLabel = "Owulacja";
-  else if (activeType === "fertile") phaseLabel = "Dni płodne";
-  else if (onPills) phaseLabel = "Aktywne dni";
+  let phaseDetail;
+  if (activeType === "ovulation") phaseDetail = "Owulacja";
+  else if (activeType === "fertile") phaseDetail = "Dni płodne";
+  else if (onPills) phaseDetail = "Aktywne dni";
   else if (cycleDay && pred.cycle_length) {
-    phaseLabel =
+    phaseDetail =
       cycleDay < pred.cycle_length - 14 ? "Faza folikularna" : "Faza lutealna";
+  } else {
+    phaseDetail = null;
   }
 
-  const dayLine = periodDay
-    ? `Dzień ${periodDay}`
-    : cycleDay
-    ? `Dzień ${cycleDay} cyklu`
-    : "Zacznij śledzenie";
-
+  let phaseLabel;
+  let dayLine;
   let noteLine;
-  if (periodDay === 1) {
-    noteLine = `Cykl trwał ${cycleLen} dni`;
+
+  if (periodDay) {
+    phaseLabel = "Okres";
+    dayLine = `Dzień ${periodDay}`;
+    if (periodDay === 1) {
+      noteLine = `Cykl trwał ${cycleLen} dni`;
+    } else if (countdown !== null) {
+      noteLine =
+        countdown === 0 ? "okres — dziś!" : `${countdown} dni do okresu`;
+    } else if (onPills) {
+      noteLine = "Kolejna przerwa wg kalendarza";
+    } else {
+      noteLine = "Dodaj okres w kalendarzu";
+    }
   } else if (countdown !== null) {
-    noteLine =
+    phaseLabel = "Okres przewidywany";
+    dayLine =
       countdown > 0
-        ? `${countdown} dni do okresu`
+        ? `za ${countdown} dni`
         : countdown === 0
-        ? "okres — dziś!"
+        ? "dziś!"
         : `${-countdown} dni po terminie`;
-  } else if (onPills) {
-    noteLine = "Kolejna przerwa wg kalendarza";
+    noteLine = cycleDay
+      ? `Dzień ${cycleDay} cyklu${phaseDetail ? " · " + phaseDetail : ""}`
+      : phaseDetail || "Dodaj okres w kalendarzu";
   } else {
-    noteLine = "Dodaj okres w kalendarzu";
+    phaseLabel = "Śledzenie";
+    dayLine = cycleDay ? `Dzień ${cycleDay} cyklu` : "Zacznij śledzenie";
+    noteLine = onPills ? "Kolejna przerwa wg kalendarza" : "Dodaj okres w kalendarzu";
   }
 
   const week = weekOf(today);

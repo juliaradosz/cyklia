@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../api/auth.jsx";
 import { api } from "../api/client.js";
 import Icon from "../components/Icon.jsx";
+import StatsPage from "./StatsPage.jsx";
 
 export default function ProfilePage() {
   const { user, logout, updateUser } = useAuth();
@@ -295,6 +296,20 @@ export default function ProfilePage() {
     );
   }
 
+  if (view === "stats") {
+    return (
+      <div>
+        <div className="sub-screen-head">
+          <button className="icon-btn" onClick={() => setView("home")} aria-label="Wróć">
+            <Icon name="chevron-left" size={20} />
+          </button>
+          <h1>Statystyki</h1>
+        </div>
+        <StatsPage />
+      </div>
+    );
+  }
+
   if (view === "privacy") {
     return (
       <div>
@@ -403,6 +418,12 @@ export default function ProfilePage() {
             <Icon name="pill" size={19} />
           </span>
           <span className="sm-title">Antykoncepcja</span>
+        </button>
+        <button className="set-row" onClick={() => setView("stats")}>
+          <span className="set-ico">
+            <Icon name="chart" size={19} />
+          </span>
+          <span className="sm-title">Statystyki</span>
         </button>
       </div>
 
