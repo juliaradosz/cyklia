@@ -118,29 +118,17 @@ export default function Dashboard() {
 
   const isTodayView = activeDay === today;
   const activeType = data.days[activeDay] || "normal";
-  const actPrevStart = sortedStarts.filter((s) => s.start_date <= activeDay).pop();
   const periodStartDate = sortedStarts.filter((s) => s.start_date <= activeDay).pop();
   const periodDay =
     activeType === "period" && periodStartDate
       ? daysBetween(periodStartDate.start_date, activeDay) + 1
       : null;
-  const cycleDay = actPrevStart ? daysBetween(actPrevStart.start_date, activeDay) + 1 : null;
   const nextRegStart = sortedStarts.find((s) => s.start_date > activeDay);
   const countdown = nextRegStart
     ? daysBetween(activeDay, nextRegStart.start_date)
     : pred.next_period_start
     ? daysBetween(activeDay, pred.next_period_start)
     : null;
-
-  let phaseDetail;
-  if (activeType === "ovulation") phaseDetail = "Owulacja";
-  else if (activeType === "fertile") phaseDetail = "Dni płodne";
-  else if (cycleDay && pred.cycle_length) {
-    phaseDetail =
-      cycleDay < pred.cycle_length - 14 ? "Faza folikularna" : "Faza lutealna";
-  } else {
-    phaseDetail = null;
-  }
 
   let phaseLabel;
   let dayLine;
@@ -155,20 +143,18 @@ export default function Dashboard() {
       noteLine = "Okres trwa";
     }
   } else if (countdown !== null) {
-    phaseLabel = phaseDetail || "Śledzenie";
+    phaseLabel = "Śledzenie";
     dayLine =
       countdown > 0
         ? `Okres za ${countdown} dni`
         : countdown === 0
         ? "okres — dziś!"
         : `${-countdown} dni po terminie`;
-    noteLine = cycleDay
-      ? `Dzień ${cycleDay} cyklu`
-      : "Dodaj okres w kalendarzu";
+    noteLine = "";
   } else {
     phaseLabel = "Śledzenie";
-    dayLine = cycleDay ? `Dzień ${cycleDay} cyklu` : "Zacznij śledzenie";
-    noteLine = onPills ? "" : "Dodaj okres w kalendarzu";
+    dayLine = "Zacznij śledzenie";
+    noteLine = "";
   }
 
   const week = weekOf(addDays(today, weekOffset * 7));
