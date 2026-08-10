@@ -363,7 +363,7 @@ export default function CalendarPage() {
                       >
                         <span className="cnum">{c.day}</span>
                         <span className="cmark">
-                          {sexDays.has(c.iso) && <Icon name="heart" size={9} />}
+                          {sexDays.has(c.iso) && <Icon name="heart" size={9} filled />}
                           {onPills && pillSet.has(c.iso) && <Icon name="pill" size={9} />}
                         </span>
                       </button>
@@ -416,9 +416,11 @@ export default function CalendarPage() {
                             c.iso === today ? " t" : ""
                           }`}
                         >
-                          {c.day}
-                          {sexDays.has(c.iso) && <Icon name="heart" size={6} />}
-                          {onPills && pillSet.has(c.iso) && <Icon name="pill" size={6} />}
+                          <span className="ynum">{c.day}</span>
+                          <span className="ymark">
+                            {sexDays.has(c.iso) && <Icon name="heart" size={6} filled />}
+                            {onPills && pillSet.has(c.iso) && <Icon name="pill" size={6} />}
+                          </span>
                         </span>
                       ) : (
                         <span key={c.iso} className="ycell empty" />

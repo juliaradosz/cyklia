@@ -1321,35 +1321,53 @@ select {
 }
 .ycell {
   position: relative;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--ink-2);
-  height: 24px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  gap: 1px;
+  height: 24px;
 }
 .ycell.empty {
   visibility: hidden;
 }
-.ycell.p {
+.ycell .ynum {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ycell.p .ynum {
   background: var(--pink-500);
   color: #fff;
   font-weight: 800;
 }
-.ycell.t {
+.ycell.t .ynum {
   box-shadow: inset 0 0 0 1px var(--pink-500);
   color: var(--pink-600);
   font-weight: 800;
 }
-.ycell svg {
-  position: absolute;
-  right: 0;
-  top: 0;
+.ycell.t.p .ynum {
+  box-shadow: inset 0 0 0 1.5px #fff;
+}
+.ycell .ymark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  height: 7px;
+  min-height: 7px;
   color: var(--pink-600);
 }
-.ycell.p svg {
+.ycell .ymark svg {
+  display: block;
+}
+.ycell.p .ymark {
   color: #fff;
 }
 .sheet-pill {
