@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [inspos, setInspos] = useState([]);
   const [pillLog, setPillLog] = useState(null);
   const [patchLog, setPatchLog] = useState(null);
+  const [dayStatus, setDayStatus] = useState(null);
   const [pillTimeInput, setPillTimeInput] = useState(nowHM());
   const [sheet, setSheet] = useState(null);
   const [sexSel, setSexSel] = useState([]);
@@ -54,6 +55,25 @@ export default function Dashboard() {
     setWeekOffset(0);
     setSlideDir("");
   }, [today, data]);
+
+  useEffect(() => {
+    let live = true;
+    const method = data?.prediction?.method;
+    if (!method || (method !== "pill" && method !== "patch")) {
+      setDayStatus(null);
+      return () => {};
+    }
+    api(
+      method === "patch"
+        ? `/patch/log?date=${activeDay}`
+        : `/pills/log?date=${activeDay}`
+    )
+      .then((s) => live && setDayStatus(s))
+      .catch(() => live && setDayStatus(null));
+    return () => {
+      live = false;
+    };
+  }, [activeDay, data]);
 
   useEffect(() => {
     (async () => {
@@ -136,15 +156,9 @@ export default function Dashboard() {
 
   if (periodDay) {
     phaseLabel = "Okres";
-    dayLine = `Dzień ${periodDay}`;
-    if (periodDay === 1) {
-      noteLine = `Cykl trwał ${cycleLen} dni`;
-    } else {
-      noteLine = "Okres trwa";
-    }
+    noteLine = periodDay === 1 ? `Cykl trwał ${cycleLen} dni` : "Okres trwa";
   } else if (countdown !== null) {
-    phaseLabel = "Śledzenie";
-    dayLine =
+    phaseLabel =
       countdown > 0
         ? `${countdown} ${countdown === 1 ? "dzień" : "dni"} do okresu`
         : countdown === 0
@@ -152,9 +166,21 @@ export default function Dashboard() {
         : `${-countdown} dni po terminie`;
     noteLine = "";
   } else {
-    phaseLabel = "Śledzenie";
-    dayLine = "Zacznij śledzenie";
+    phaseLabel = "Zacznij śledzenie";
     noteLine = "";
+  }
+
+  if (periodDay) {
+    dayLine = `Dzień ${periodDay}`;
+  } else if (patchMode) {
+    dayLine = dayStatus?.message || "Plaster";
+  } else if (onPills) {
+    const pd = dayStatus?.pack_day;
+    if (pd == null) dayLine = "Tabletki";
+    else if (pd < 0) dayLine = `Przerwa w tabletkach — dzień ${-pd}`;
+    else dayLine = `Tabletki — dzień ${pd}${pd === 1 ? " · start pakietu" : ""}`;
+  } else {
+    dayLine = noteLine || "";
   }
 
   const week = weekOf(addDays(today, weekOffset * 7));

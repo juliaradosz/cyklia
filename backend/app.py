@@ -911,6 +911,17 @@ def _pill_status(user_id, day):
         user["pill_cycle_days"] or 21,
         _pill_break_value(user),
     )
+    pack_day = None
+    if on_pills and user.get("pill_start_date"):
+        active_n = user["pill_cycle_days"] or 21
+        brk_n = _pill_break_value(user)
+        total_n = active_n + brk_n
+        if brk_n > 0:
+            pos = (cyc.parse_date(day) - cyc.parse_date(user["pill_start_date"])).days % total_n
+            if pos < active_n:
+                pack_day = pos + 1
+            else:
+                pack_day = -(pos - active_n + 1)
     log = db.query_one(
         "SELECT * FROM pill_logs WHERE user_id = ? AND date = ?", (user_id, day)
     )
@@ -941,6 +952,7 @@ def _pill_status(user_id, day):
         "on_pills": on_pills,
         "day_type": day_type,
         "needs_log": needs_log,
+        "pack_day": pack_day,
         "taken": bool(log),
         "taken_at": taken_at,
         "expected_time": expected,
