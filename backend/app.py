@@ -547,7 +547,7 @@ def create_app():
             method=method["method"],
         )
         phase_order = (
-            ["Aktywne dni", "Przerwa"]
+            ["Przerwa"]
             if pred.get("on_pills")
             else ["Okres", "Faza folikularna", "Faza lutealna"]
         )
@@ -1161,7 +1161,7 @@ def _entry_phase(day, prediction, cycle_starts, period_length=5):
         return None
     if prediction.get("on_pills"):
         day_type = cyc.day_type_for(day, cycle_starts, [], prediction)
-        return "Przerwa" if day_type == "period" else "Aktywne dni"
+        return "Przerwa" if day_type == "period" else None
     cycle = prediction.get("cycle_length") or 28
     period_len = int(period_length or 5)
     last = None

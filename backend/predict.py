@@ -67,7 +67,7 @@ def _phase(day, starts, ends, prediction, period_length, on_pills):
         prediction,
     )
     if on_pills:
-        return "Przerwa" if day_type == "period" else "Aktywne dni"
+        return "Przerwa" if day_type == "period" else None
     if day_type == "period":
         return "Okres"
     if day_type == "ovulation":
@@ -135,7 +135,6 @@ def predict_feel(user_id, day):
         "Owulacja": "Owulacja",
         "Dni płodne": "Dni płodne",
         "Przerwa": "Przerwa",
-        "Aktywne dni": "Aktywne dni",
     }
 
     similar = []
@@ -169,7 +168,7 @@ def predict_feel(user_id, day):
         return {
             "date": day,
             "phase": target_phase,
-            "phase_name": phase_names.get(target_phase, target_phase or "—"),
+            "phase_name": phase_names.get(target_phase),
             "cycle_day": target_cd,
             "sample_count": 0,
             "symptoms": [],
@@ -200,7 +199,7 @@ def predict_feel(user_id, day):
     result = {
         "date": day,
         "phase": target_phase,
-        "phase_name": phase_names.get(target_phase, target_phase or "—"),
+        "phase_name": phase_names.get(target_phase),
         "cycle_day": target_cd,
         "sample_count": len(similar),
         "symptoms": symptoms,

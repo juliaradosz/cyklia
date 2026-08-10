@@ -135,7 +135,6 @@ export default function Dashboard() {
   let phaseDetail;
   if (activeType === "ovulation") phaseDetail = "Owulacja";
   else if (activeType === "fertile") phaseDetail = "Dni płodne";
-  else if (onPills) phaseDetail = "Aktywne dni";
   else if (cycleDay && pred.cycle_length) {
     phaseDetail =
       cycleDay < pred.cycle_length - 14 ? "Faza folikularna" : "Faza lutealna";
