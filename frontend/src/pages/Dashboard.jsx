@@ -151,8 +151,6 @@ export default function Dashboard() {
     dayLine = `Dzień ${periodDay}`;
     if (periodDay === 1) {
       noteLine = `Cykl trwał ${cycleLen} dni`;
-    } else if (onPills) {
-      noteLine = "Kolejna przerwa wg kalendarza";
     } else {
       noteLine = "Okres trwa";
     }
@@ -170,7 +168,7 @@ export default function Dashboard() {
   } else {
     phaseLabel = "Śledzenie";
     dayLine = cycleDay ? `Dzień ${cycleDay} cyklu` : "Zacznij śledzenie";
-    noteLine = onPills ? "Kolejna przerwa wg kalendarza" : "Dodaj okres w kalendarzu";
+    noteLine = onPills ? "" : "Dodaj okres w kalendarzu";
   }
 
   const week = weekOf(addDays(today, weekOffset * 7));

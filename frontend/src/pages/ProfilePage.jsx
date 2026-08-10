@@ -24,6 +24,7 @@ export default function ProfilePage() {
   const [pillCycle, setPillCycle] = useState(user?.pill_cycle_days || 21);
   const [pillBreak, setPillBreak] = useState(user?.pill_break_days || 7);
   const [pillTime, setPillTime] = useState(user?.pill_time || "12:00");
+  const [pillStart, setPillStart] = useState(user?.pill_start_date || "");
   const [saved, setSaved] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState("");
@@ -62,6 +63,7 @@ export default function ProfilePage() {
         pill_cycle_days: pillMode ? Number(pillCycle) : 21,
         pill_break_days: pillMode ? Number(pillBreak) : 7,
         pill_time: pillMode ? pillTime : "12:00",
+        pill_start_date: pillMode ? pillStart : "",
         patch_mode: patchMode,
         patch_name: patchMode ? patchName : "",
         ...extra,
@@ -76,6 +78,7 @@ export default function ProfilePage() {
       pill_cycle_days: pillMode ? Number(pillCycle) : 21,
       pill_break_days: pillMode ? Number(pillBreak) : 7,
       pill_time: pillMode ? pillTime : "12:00",
+      pill_start_date: pillMode ? pillStart : "",
       patch_mode: patchMode,
       patch_name: patchMode ? patchName : "",
       ...extra,
@@ -246,6 +249,20 @@ export default function ProfilePage() {
                 value={pillTime}
                 onChange={(e) => setPillTime(e.target.value)}
               />
+            </div>
+            <div className="field" style={{ marginTop: 12 }}>
+              <label>Dzień rozpoczęcia przyjmowania tabletek</label>
+              <input
+                type="date"
+                value={pillStart}
+                onChange={(e) => setPillStart(e.target.value)}
+              />
+              <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
+                Podaj pierwszą datę, w której zaczęłaś nowy blister. Cyklia
+                policzy z niej: dni przyjmowania ({pillCycle || 21} dni),
+                potem {pillBreak || 7}-dniową przerwę i kolejny start — nawet
+                gdy nie zaznaczasz okresu w kalendarzu.
+              </p>
             </div>
             <p className="muted" style={{ fontSize: 11 }}>
               Cyklia ostrzeże Cię, jeśli tabletkę przyjmiesz znacznie później

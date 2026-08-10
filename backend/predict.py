@@ -41,6 +41,7 @@ def _user_method(user):
             "method": "pill",
             "cycle": user["pill_cycle_days"] or 21,
             "break": user["pill_break_days"] if user["pill_break_days"] is not None else 7,
+            "start": user.get("pill_start_date") or None,
         }
     return {"on": False, "method": None, "cycle": 21, "break": 7}
 
@@ -55,6 +56,7 @@ def _prediction(user, starts):
         pill_cycle=method["cycle"],
         pill_break=method["break"],
         method=method["method"],
+        pill_start=method.get("start"),
     )
 
 

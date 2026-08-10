@@ -94,6 +94,15 @@ def create_app():
                 t = "12:00"
             fields.append("pill_time = ?")
             args.append(t)
+        if "pill_start_date" in data:
+            ps = (data.get("pill_start_date") or "").strip() or None
+            if ps is not None:
+                try:
+                    datetime.strptime(ps, "%Y-%m-%d")
+                except ValueError:
+                    ps = None
+            fields.append("pill_start_date = ?")
+            args.append(ps)
         if "patch_mode" in data:
             fields.append("patch_mode = ?")
             args.append(1 if data["patch_mode"] else 0)
@@ -468,6 +477,7 @@ def create_app():
             pill_cycle=method["cycle"],
             pill_break=method["break"],
             method=method["method"],
+            pill_start=method.get("start"),
         )
         # zakres widoczny: od pierwszego wpisu do +90 dni w przyszłość
         min_day = min(starts) if starts else date.today().isoformat()
@@ -857,7 +867,7 @@ def _user_payload(user_id):
     u = db.query_one(
         "SELECT id, email, display_name, cycle_length_default, period_length_default, "
         "pill_mode, pill_cycle_days, pill_break_days, pill_name, pill_time, "
-        "patch_mode, patch_name, created_at "
+        "pill_start_date, patch_mode, patch_name, created_at "
         "FROM users WHERE id = ?",
         (user_id,),
     )
@@ -892,6 +902,7 @@ def _pill_status(user_id, day):
         pills=on_pills,
         pill_cycle=user["pill_cycle_days"] or 21,
         pill_break=_pill_break_value(user),
+        pill_start=user.get("pill_start_date") or None,
     )
     day_type = cyc.day_type_for(day, starts, ends, pred) if on_pills else "normal"
     needs_log = on_pills and day_type != "period"
@@ -951,6 +962,7 @@ def _user_method(user):
             "cycle": user["pill_cycle_days"] or 21,
             "break": (user["pill_break_days"] if user["pill_break_days"] is not None else 7),
             "break_days": (user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+            "start": user.get("pill_start_date") or None,
         }
     return {"on": False, "method": None, "cycle": 21, "break": 7, "break_days": 7}
 

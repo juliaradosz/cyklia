@@ -30,18 +30,47 @@ def build_calendar(
     pill_cycle=21,
     pill_break=7,
     method=None,
+    pill_start=None,
 ):
     """Zwraca prognozę na podstawie listy dat rozpoczęcia okresów.
 
     pills=True → tryb antykoncepcji hormonalnej: brak owulacji i dni płodnych,
     kolejna miesiączka przewidywana w przerwie między blistrami / plastrami.
     method: "pill" | "patch" | None — typ antykoncepcji.
+    pill_start: data rozpoczęcia przyjmowania tabletek (kotwica schematu);
+    wtedy przerwa liczona jest od dnia: pill_start + pill_cycle dni, cykl
+    powtarza się co (pill_cycle + pill_break) dni.
     """
     start_dates = sorted(set(parse_date(s) if isinstance(s, str) else s for s in start_dates))
     per = int(period_length or 5)
 
     if pills:
-        total = max(int(pill_cycle), 1) + max(int(pill_break), 0)
+        active = max(int(pill_cycle), 1)
+        brk = max(int(pill_break), 0)
+        total = active + brk
+        if pill_start:
+            ps = parse_date(pill_start)
+            today = date.today()
+            idx = (today - ps).days
+            anchor = ps + timedelta(days=(idx // total) * total)
+            active_end = anchor + timedelta(days=active - 1)
+            next_start = (
+                anchor + timedelta(days=total)
+                if today > active_end
+                else anchor + timedelta(days=active)
+            )
+            return {
+                "has_data": True,
+                "on_pills": True,
+                "method": method,
+                "next_period_start": iso(next_start),
+                "ovulation_date": None,
+                "fertile_start": None,
+                "fertile_end": None,
+                "cycle_length": total,
+                "period_length": per,
+                "pill_break_days": brk,
+            }
         if not start_dates:
             return {
                 "has_data": False,
