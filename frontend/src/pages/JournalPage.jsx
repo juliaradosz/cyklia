@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { useCalendar } from "../hooks.js";
 import {
@@ -63,8 +63,10 @@ const POPULAR_SYMPTOMS = [
 
 export default function JournalPage() {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const today = todayISO();
   const initDate = params.get("date") || today;
+  const returnTo = params.get("return");
   const [date, setDate] = useState(initDate);
   const [form, setForm] = useState(EMPTY);
   const [entries, setEntries] = useState([]);
@@ -227,6 +229,7 @@ export default function JournalPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2200);
       await loadList();
+      if (returnTo === "kalendarz") navigate("/kalendarz");
     } finally {
       setBusy(false);
     }

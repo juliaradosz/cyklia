@@ -1264,53 +1264,74 @@ select {
   height: 40px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(14px) saturate(1.5);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
   color: var(--ink-2);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 14px rgba(94, 38, 66, 0.1);
+  box-shadow: 0 6px 18px rgba(94, 38, 66, 0.12);
 }
 .cal-year-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
 }
 .cal-year-month {
   border: none;
-  background: rgba(255, 255, 255, 0.68);
-  border-radius: 18px;
-  padding: 10px 8px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  border-radius: 20px;
+  padding: 12px 10px 14px;
   text-align: center;
   color: var(--ink);
-  box-shadow: 0 6px 18px rgba(94, 38, 66, 0.08);
+  box-shadow: 0 10px 26px rgba(94, 38, 66, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 .cal-year-month:active {
   transform: scale(0.97);
 }
 .cal-year-month b {
   display: block;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
-  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+  margin-bottom: 8px;
   color: var(--pink-700);
   text-transform: capitalize;
+}
+.cal-year-dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 3px;
+}
+.cal-year-dow span {
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--ink-3);
+  text-transform: uppercase;
 }
 .cal-year-cells {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
+  gap: 2px;
 }
 .ycell {
   position: relative;
-  font-size: 7.5px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--ink-2);
-  height: 15px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+}
+.ycell.empty {
+  visibility: hidden;
 }
 .ycell.p {
   background: var(--pink-500);
@@ -1468,6 +1489,32 @@ select {
   font-weight: 600;
   color: var(--ink-2);
   text-align: right;
+}
+.sr-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sr-side .sr-value {
+  text-align: right;
+}
+.sr-add {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--grad-main);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-btn);
+  transition: transform 0.1s ease;
+}
+.sr-add:active {
+  transform: scale(0.9);
 }
 .sheet-actions {
   display: flex;

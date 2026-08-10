@@ -10,8 +10,11 @@ import {
   daysBetween,
   formatPL,
   MOODS,
+  WEEK_LETTERS,
 } from "../utils.js";
 import Icon from "../components/Icon.jsx";
+
+const RETURN_KEY = "cyklia_cal_return";
 
 const DOW = ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"];
 const MONTHS = [
@@ -54,6 +57,7 @@ export default function CalendarPage() {
   const [pillTime, setPillTime] = useState("12:00");
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef(null);
+  const restoreScrollRef = useRef(null);
 
   useEffect(() => {
     Promise.all([
@@ -97,6 +101,35 @@ export default function CalendarPage() {
       el.scrollTo({ top: Math.max(0, target.offsetTop), behavior: "auto" });
     }
   }, [view, anchor.y, anchor.m, data]);
+
+  useEffect(() => {
+    let saved = null;
+    try {
+      const raw = sessionStorage.getItem(RETURN_KEY);
+      if (raw) saved = JSON.parse(raw);
+    } catch {
+      saved = null;
+    }
+    if (!saved) return;
+    sessionStorage.removeItem(RETURN_KEY);
+    if (saved.view) setView(saved.view);
+    if (saved.anchor) setAnchor(saved.anchor);
+    if (saved.year) setYear(saved.year);
+    if (typeof saved.scrollTop === "number") restoreScrollRef.current = saved.scrollTop;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const saved = restoreScrollRef.current;
+    if (saved == null) return;
+    const el =
+      view === "month"
+        ? scrollRef.current
+        : document.querySelector(".cal-year-wrap");
+    if (!el) return;
+    el.scrollTop = saved;
+    restoreScrollRef.current = null;
+  }, [view, data]);
 
   const periodDays = useMemo(
     () =>
@@ -162,6 +195,30 @@ export default function CalendarPage() {
         .then(setSelStatus)
         .catch(() => setSelStatus(null));
     }
+  }
+
+  function goAddSymptoms() {
+    if (!selected) return;
+    try {
+      sessionStorage.setItem(
+        RETURN_KEY,
+        JSON.stringify({
+          view,
+          anchor,
+          year,
+          scrollTop:
+            view === "month"
+              ? scrollRef.current?.scrollTop ?? 0
+              : document.querySelector(".cal-year-wrap")?.scrollTop ?? 0,
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+    const q = new URLSearchParams();
+    if (selected !== today) q.set("date", selected);
+    q.set("return", "kalendarz");
+    navigate(`/dziennik?${q.toString()}`);
   }
 
   async function markPill() {
@@ -332,7 +389,10 @@ export default function CalendarPage() {
           </div>
           <div className="cal-year-grid">
             {MONTHS_SHORT.map((mn, i) => {
-              const cells = monthCells(year, i).filter((c) => c.inMonth);
+              const all = monthCells(year, i);
+              const first = all.findIndex((c) => c.inMonth);
+              const last = all.map((c) => c.inMonth).lastIndexOf(true);
+              const cells = all.slice(first, last + 1);
               return (
                 <button
                   key={i}
@@ -343,19 +403,28 @@ export default function CalendarPage() {
                   }}
                 >
                   <b>{mn}</b>
-                  <div className="cal-year-cells">
-                    {cells.map((c) => (
-                      <span
-                        key={c.iso}
-                        className={`ycell${periodDays.has(c.iso) ? " p" : ""}${
-                          c.iso === today ? " t" : ""
-                        }`}
-                      >
-                        {c.day}
-                        {sexDays.has(c.iso) && <Icon name="heart" size={6} />}
-                        {onPills && pillSet.has(c.iso) && <Icon name="pill" size={6} />}
-                      </span>
+                  <div className="cal-year-dow">
+                    {WEEK_LETTERS.map((d, di) => (
+                      <span key={di}>{d}</span>
                     ))}
+                  </div>
+                  <div className="cal-year-cells">
+                    {cells.map((c) =>
+                      c.inMonth ? (
+                        <span
+                          key={c.iso}
+                          className={`ycell${periodDays.has(c.iso) ? " p" : ""}${
+                            c.iso === today ? " t" : ""
+                          }`}
+                        >
+                          {c.day}
+                          {sexDays.has(c.iso) && <Icon name="heart" size={6} />}
+                          {onPills && pillSet.has(c.iso) && <Icon name="pill" size={6} />}
+                        </span>
+                      ) : (
+                        <span key={c.iso} className="ycell empty" />
+                      )
+                    )}
                   </div>
                 </button>
               );
@@ -388,11 +457,7 @@ export default function CalendarPage() {
               </div>
               <button
                 className="sh-add"
-                onClick={() =>
-                  navigate(
-                    `/dziennik${selected === today ? "" : `?date=${selected}`}`
-                  )
-                }
+                onClick={goAddSymptoms}
                 aria-label="Dodaj lub edytuj wpis"
               >
                 <Icon name="plus" size={20} />
@@ -413,9 +478,18 @@ export default function CalendarPage() {
 
             <div className="sheet-row">
               <span className="sr-label">Objawy</span>
-              <span className="sr-value">
-                {syms.length ? syms.slice(0, 4).join(", ") : "—"}
-              </span>
+              <div className="sr-side">
+                <span className="sr-value">
+                  {syms.length ? syms.slice(0, 4).join(", ") : "—"}
+                </span>
+                <button
+                  className="sr-add"
+                  onClick={goAddSymptoms}
+                  aria-label="Dodaj objawy"
+                >
+                  <Icon name="plus" size={16} />
+                </button>
+              </div>
             </div>
             <div className="sheet-row">
               <span className="sr-label">Obserwacje</span>
