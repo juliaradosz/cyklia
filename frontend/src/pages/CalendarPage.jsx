@@ -147,7 +147,11 @@ export default function CalendarPage() {
         const arr = JSON.parse(e.sex);
         if (
           Array.isArray(arr) &&
-          arr.some((x) => x && x !== "Dzień bez seksu")
+          arr.some(
+            (x) =>
+              x === "Seks z zabezpieczeniem" ||
+              x === "Seks bez zabezpieczenia"
+          )
         ) {
           s.add(e.date);
         }
@@ -160,10 +164,22 @@ export default function CalendarPage() {
 
   const pillSet = useMemo(() => new Set(pillDates || []), [pillDates]);
 
+  const patchDays = useMemo(() => {
+    const s = new Set();
+    (cycles || []).forEach((c) => {
+      const st = c.start_date;
+      s.add(st);
+      s.add(addDays(st, 7));
+      s.add(addDays(st, 14));
+    });
+    return s;
+  }, [cycles]);
+
   if (!data) return <div className="center-screen">Ładowanie…</div>;
 
   const pred = data.prediction;
   const onPills = !!pred.on_pills;
+  const patchMode = pred.method === "patch";
 
   function phaseLabel(day) {
     const dayType = data.days[day] || "normal";
@@ -190,7 +206,11 @@ export default function CalendarPage() {
     api(`/entries/${day}`)
       .then(setEntry)
       .catch(() => setEntry(null));
-    if (onPills) {
+    if (patchMode) {
+      api(`/patch/log?date=${day}`)
+        .then(setSelStatus)
+        .catch(() => setSelStatus(null));
+    } else if (onPills) {
       api(`/pills/log?date=${day}`)
         .then(setSelStatus)
         .catch(() => setSelStatus(null));
@@ -248,6 +268,36 @@ export default function CalendarPage() {
       setSelStatus(s);
       const p = await api("/pills/log/dates").catch(() => ({ dates: [] }));
       setPillDates(p?.dates || []);
+    } catch {
+      /* ignore */
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function markPatch() {
+    setBusy(true);
+    try {
+      const s = await api("/patch/log", {
+        method: "POST",
+        body: { date: selected },
+      });
+      setSelStatus(s);
+    } catch (err) {
+      alert(err.message || "Nie udało się zapisać");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unmarkPatch() {
+    setBusy(true);
+    try {
+      const s = await api("/patch/log", {
+        method: "DELETE",
+        body: { date: selected },
+      });
+      setSelStatus(s);
     } catch {
       /* ignore */
     } finally {
@@ -363,8 +413,17 @@ export default function CalendarPage() {
                       >
                         <span className="cnum">{c.day}</span>
                         <span className="cmark">
-                          {sexDays.has(c.iso) && <Icon name="heart" size={9} filled />}
-                          {onPills && pillSet.has(c.iso) && <Icon name="pill" size={9} />}
+                          {sexDays.has(c.iso) && (
+                            <Icon name="heart" size={9} filled className="hicon" />
+                          )}
+                          {patchMode
+                            ? patchDays.has(c.iso) && (
+                                <Icon name="pill" size={9} className="picon" />
+                              )
+                            : onPills &&
+                              pillSet.has(c.iso) && (
+                                <Icon name="pill" size={9} className="picon" />
+                              )}
                         </span>
                       </button>
                     ) : (
@@ -418,8 +477,17 @@ export default function CalendarPage() {
                         >
                           <span className="ynum">{c.day}</span>
                           <span className="ymark">
-                            {sexDays.has(c.iso) && <Icon name="heart" size={6} filled />}
-                            {onPills && pillSet.has(c.iso) && <Icon name="pill" size={6} />}
+                            {sexDays.has(c.iso) && (
+                              <Icon name="heart" size={6} filled className="hicon" />
+                            )}
+                            {patchMode
+                              ? patchDays.has(c.iso) && (
+                                  <Icon name="pill" size={6} className="picon" />
+                                )
+                              : onPills &&
+                                pillSet.has(c.iso) && (
+                                  <Icon name="pill" size={6} className="picon" />
+                                )}
                           </span>
                         </span>
                       ) : (
@@ -525,7 +593,7 @@ export default function CalendarPage() {
               </span>
             </div>
 
-            {onPills && selStatus && (
+            {!patchMode && onPills && selStatus && (
               <div className="sheet-pill">
                 <div className="sr-label" style={{ textAlign: "left" }}>
                   Tabletka antykoncepcyjna
@@ -568,6 +636,48 @@ export default function CalendarPage() {
                     >
                       <Icon name="check" size={16} /> Wzięłam
                     </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {patchMode && selStatus && (
+              <div className="sheet-pill">
+                <div className="sr-label" style={{ textAlign: "left" }}>
+                  Plaster antykoncepcyjny
+                </div>
+                {selStatus.needs_change ? (
+                  selStatus.applied ? (
+                    <>
+                      <div className="sr-value" style={{ textAlign: "left" }}>
+                        {selStatus.message}
+                      </div>
+                      <button
+                        className="sheet-btn soft"
+                        onClick={unmarkPatch}
+                        disabled={busy}
+                      >
+                        <Icon name="trash" size={16} /> Cofnij
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="sr-value" style={{ textAlign: "left" }}>
+                        {selStatus.message}
+                      </div>
+                      <button
+                        className="sheet-btn soft"
+                        onClick={markPatch}
+                        disabled={busy}
+                        style={{ padding: "10px 14px" }}
+                      >
+                        <Icon name="check" size={16} /> {selStatus.confirm_label}
+                      </button>
+                    </>
+                  )
+                ) : (
+                  <div className="sr-value" style={{ textAlign: "left" }}>
+                    {selStatus.message}
                   </div>
                 )}
               </div>

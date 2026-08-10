@@ -74,6 +74,13 @@ def _personal_reply(message, ctx):
     # Pytania typu "co to jest owulacja?" to definicje — zostaw je regułom wiedzy.
     asking_definition = any(k in msg for k in ["co to", "czym jest", "czym jest", "definicj", "co oznacza"])
     if not asking_definition and ("owulacj" in msg or "dni płodn" in msg or "dni plodn" in msg):
+        if ctx.get("method") == "patch":
+            return (
+                "Stosujesz plaster antykoncepcyjny, więc owulacja i dni płodne "
+                "nie występują — hormonoterapia je blokuje. Pamiętaj tylko o "
+                "zmianie plastra: nowy naklejasz w 1., 8. i 15. dniu cyklu, "
+                "a w 22. dniu zaczynasz 7-dniową przerwę."
+            )
         if ctx.get("on_pills"):
             name = ctx.get("pill_name") or "tabletki antykoncepcyjne"
             return (

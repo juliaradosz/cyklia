@@ -76,6 +76,7 @@ export default function JournalPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [jumpDate, setJumpDate] = useState(today);
   const [pillLog, setPillLog] = useState(null);
+  const [patchLog, setPatchLog] = useState(null);
   const [pillTimeInput, setPillTimeInput] = useState(nowHM());
   const [cycles, setCycles] = useState([]);
   const { data: cal } = useCalendar();
@@ -134,13 +135,16 @@ export default function JournalPage() {
     } catch {
       setForm(EMPTY);
     }
-    try {
-      const p = await api(`/pills/log?date=${day}`);
-      setPillLog(p);
-    } catch {
-      setPillLog(null);
-    }
   }
+
+  useEffect(() => {
+    if (!cal || !cal.prediction) return;
+    const isPatch = cal.prediction.method === "patch";
+    const q = isPatch ? `/patch/log?date=${date}` : `/pills/log?date=${date}`;
+    api(q)
+      .then((p) => (isPatch ? setPatchLog(p) : setPillLog(p)))
+      .catch(() => (isPatch ? setPatchLog(null) : setPillLog(null)));
+  }, [cal, date]);
 
   useEffect(() => {
     loadEntry(initDate);
@@ -283,6 +287,29 @@ export default function JournalPage() {
     }
   }
 
+  async function applyPatch() {
+    try {
+      const p = await api("/patch/log", {
+        method: "POST",
+        body: { date },
+      });
+      setPatchLog(p);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function undoPatch() {
+    try {
+      const p = await api("/patch/log", { method: "DELETE", body: { date } });
+      setPatchLog(p);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const patchMode = cal?.prediction?.method === "patch";
+
   function jumpToDay() {
     loadEntry(jumpDate);
     setShowHistory(false);
@@ -368,39 +395,80 @@ export default function JournalPage() {
           </div>
         </div>
 
-        {pillLog && pillLog.needs_log && (
-          <div className="j-section">
-            <div className="j-sec-head">
-              <span className="js-ico">
-                <Icon name="pill" size={17} />
-              </span>
-              <b>Tabletka antykoncepcyjna</b>
-            </div>
-            {pillLog.taken ? (
-              <div className="pill-row">
-                <span className="pill-taken">
-                  Wzięta o {pillLog.taken_at}
-                  {pillLog.late ? " (spóźniona)" : ""}
+        {patchMode ? (
+          patchLog && (
+            <div className="j-section">
+              <div className="j-sec-head">
+                <span className="js-ico">
+                  <Icon name="pill" size={17} />
                 </span>
-                <button type="button" className="btn small ghost" onClick={undoPill}>
-                  Cofnij
-                </button>
+                <b>Plaster antykoncepcyjny</b>
               </div>
-            ) : (
-              <div className="pill-row">
-                <input
-                  type="time"
-                  className="pc-time"
-                  value={pillTimeInput}
-                  onChange={(e) => setPillTimeInput(e.target.value)}
-                />
-                <button type="button" className="btn small" onClick={logPill}>
-                  Wzięłam
-                </button>
+              {patchLog.needs_change ? (
+                patchLog.applied ? (
+                  <div className="pill-row">
+                    <span className="pill-taken">{patchLog.message}</span>
+                    <button
+                      type="button"
+                      className="btn small ghost"
+                      onClick={undoPatch}
+                    >
+                      Cofnij
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pill-row">
+                    <span className="pill-taken">{patchLog.message}</span>
+                    <button
+                      type="button"
+                      className="btn small"
+                      onClick={applyPatch}
+                    >
+                      {patchLog.confirm_label}
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div className="pill-taken">{patchLog.message}</div>
+              )}
+            </div>
+          )
+        ) : (
+          pillLog &&
+          pillLog.needs_log && (
+            <div className="j-section">
+              <div className="j-sec-head">
+                <span className="js-ico">
+                  <Icon name="pill" size={17} />
+                </span>
+                <b>Tabletka antykoncepcyjna</b>
               </div>
-            )}
-            {pillLog.warning && <div className="pill-warn">{pillLog.warning}</div>}
-          </div>
+              {pillLog.taken ? (
+                <div className="pill-row">
+                  <span className="pill-taken">
+                    Wzięta o {pillLog.taken_at}
+                    {pillLog.late ? " (spóźniona)" : ""}
+                  </span>
+                  <button type="button" className="btn small ghost" onClick={undoPill}>
+                    Cofnij
+                  </button>
+                </div>
+              ) : (
+                <div className="pill-row">
+                  <input
+                    type="time"
+                    className="pc-time"
+                    value={pillTimeInput}
+                    onChange={(e) => setPillTimeInput(e.target.value)}
+                  />
+                  <button type="button" className="btn small" onClick={logPill}>
+                    Wzięłam
+                  </button>
+                </div>
+              )}
+              {pillLog.warning && <div className="pill-warn">{pillLog.warning}</div>}
+            </div>
+          )
         )}
 
         <div className="j-section">

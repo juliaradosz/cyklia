@@ -92,18 +92,44 @@ def create_app():
                 t = "12:00"
             fields.append("pill_time = ?")
             args.append(t)
+        if "patch_mode" in data:
+            fields.append("patch_mode = ?")
+            args.append(1 if data["patch_mode"] else 0)
+            if data["patch_mode"]:
+                # wyłączenie trybu tabletek, gdy włączamy plastry
+                fields.append("pill_mode = ?")
+                args.append(0)
+        if "patch_name" in data:
+            fields.append("patch_name = ?")
+            args.append(str(data.get("patch_name") or ""))
+        if "pill_mode" in data and data["pill_mode"]:
+            # wyłączenie trybu plastrów, gdy włączamy tabletki
+            fields.append("patch_mode = ?")
+            args.append(0)
         if fields:
             args.append(user_id)
             db.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", tuple(args))
         return jsonify(_user_payload(user_id))
 
-    # ---------- Antykoncepcja (informacyjna baza tabletek) ----------
+    # ---------- Antykoncepcja (informacyjna baza tabletek i plastrów) ----------
 
     @app.get("/api/pills")
     def list_pills():
         import pills as pills_data
 
         return jsonify(pills_data.PILLS)
+
+    @app.get("/api/patches")
+    def list_patches():
+        import patches as patches_data
+
+        return jsonify(
+            {
+                "patches": patches_data.PATCHES,
+                "knowledge": patches_data.PATCH_KNOWLEDGE,
+                "schedule": patches_data.SCHEDULE,
+            }
+        )
 
     # ---------- Tabletki — dzienny log (czy wzięta i o której) ----------
 
@@ -162,6 +188,60 @@ def create_app():
             "DELETE FROM pill_logs WHERE user_id = ? AND date = ?", (user_id, day)
         )
         return jsonify(_pill_status(user_id, day))
+
+    # ---------- Plastry — dzienny log (czy naklejony) ----------
+
+    @app.get("/api/patch/log/dates")
+    @auth.auth_required
+    def list_patch_log_dates(user_id):
+        rows = db.query(
+            "SELECT date FROM patch_logs WHERE user_id = ? ORDER BY date", (user_id,)
+        )
+        return jsonify({"dates": [r["date"] for r in rows]})
+
+    @app.get("/api/patch/log")
+    @auth.auth_required
+    def get_patch_log(user_id):
+        day = request.args.get("date") or date.today().isoformat()
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Nieprawidłowa data"}), 400
+        return jsonify(_patch_status(user_id, day))
+
+    @app.post("/api/patch/log")
+    @auth.auth_required
+    def mark_patch_applied(user_id):
+        data = request.get_json(silent=True) or {}
+        day = data.get("date") or date.today().isoformat()
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Nieprawidłowa data"}), 400
+        status = _patch_status(user_id, day)
+        if not status.get("needs_change"):
+            return jsonify({"error": "Dziś nie musisz zmieniać plastra."}), 400
+        db.execute(
+            "INSERT INTO patch_logs (user_id, date, applied_at, created_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(user_id, date) DO UPDATE SET applied_at = excluded.applied_at",
+            (user_id, day, datetime.now().strftime("%H:%M"), db.now_iso()),
+        )
+        return jsonify(_patch_status(user_id, day))
+
+    @app.delete("/api/patch/log")
+    @auth.auth_required
+    def unmark_patch(user_id):
+        data = request.get_json(silent=True) or {}
+        day = data.get("date") or date.today().isoformat()
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Nieprawidłowa data"}), 400
+        db.execute(
+            "DELETE FROM patch_logs WHERE user_id = ? AND date = ?", (user_id, day)
+        )
+        return jsonify(_patch_status(user_id, day))
 
     # ---------- Cykle (okresy) ----------
 
@@ -346,13 +426,15 @@ def create_app():
         user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
         starts = [c["start_date"] for c in cycles]
         ends = [c["end_date"] for c in cycles if c["end_date"]]
+        method = _user_method(user)
         pred = cyc.build_calendar(
             starts,
             cycle_length=user["cycle_length_default"],
             period_length=user["period_length_default"],
-            pills=bool(user["pill_mode"]),
-            pill_cycle=user["pill_cycle_days"] or 21,
-            pill_break=(user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+            pills=method["on"],
+            pill_cycle=method["cycle"],
+            pill_break=method["break"],
+            method=method["method"],
         )
         # zakres widoczny: od pierwszego wpisu do +90 dni w przyszłość
         min_day = min(starts) if starts else date.today().isoformat()
@@ -421,13 +503,15 @@ def create_app():
         steps_list = [e["steps"] for e in entries if e["steps"]]
 
         user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+        method = _user_method(user)
         pred = cyc.build_calendar(
             starts,
             cycle_length=user["cycle_length_default"],
             period_length=user["period_length_default"],
-            pills=bool(user["pill_mode"]),
-            pill_cycle=user["pill_cycle_days"] or 21,
-            pill_break=(user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+            pills=method["on"],
+            pill_cycle=method["cycle"],
+            pill_break=method["break"],
+            method=method["method"],
         )
         phase_order = (
             ["Aktywne dni", "Przerwa"]
@@ -492,13 +576,15 @@ def create_app():
         )
         user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
         starts = [c["start_date"] for c in cycles]
+        method = _user_method(user)
         pred = cyc.build_calendar(
             starts,
             cycle_length=user["cycle_length_default"],
             period_length=user["period_length_default"],
-            pills=bool(user["pill_mode"]),
-            pill_cycle=user["pill_cycle_days"] or 21,
-            pill_break=(user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+            pills=method["on"],
+            pill_cycle=method["cycle"],
+            pill_break=method["break"],
+            method=method["method"],
         )
         target = "any"
         if (
@@ -737,7 +823,8 @@ def create_app():
 def _user_payload(user_id):
     u = db.query_one(
         "SELECT id, email, display_name, cycle_length_default, period_length_default, "
-        "pill_mode, pill_cycle_days, pill_break_days, pill_name, pill_time, created_at "
+        "pill_mode, pill_cycle_days, pill_break_days, pill_name, pill_time, "
+        "patch_mode, patch_name, created_at "
         "FROM users WHERE id = ?",
         (user_id,),
     )
@@ -814,6 +901,119 @@ def _pill_status(user_id, day):
     }
 
 
+def _user_method(user):
+    """Jaka antykoncepcja hormonalna jest aktywna u użytkowniczki."""
+    if user.get("patch_mode"):
+        return {
+            "on": True,
+            "method": "patch",
+            "cycle": 21,
+            "break": 7,
+            "break_days": 7,
+        }
+    if user.get("pill_mode"):
+        return {
+            "on": True,
+            "method": "pill",
+            "cycle": user["pill_cycle_days"] or 21,
+            "break": (user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+            "break_days": (user["pill_break_days"] if user["pill_break_days"] is not None else 7),
+        }
+    return {"on": False, "method": None, "cycle": 21, "break": 7, "break_days": 7}
+
+
+def _patch_status(user_id, day):
+    """Status plastra na dany dzień według 28-dniowego schematu 21+7.
+
+    Dzień 1 cyklu (start okresu) = naklejenie plastra nr 1.
+    Zmiana plastra: dzień 1, 8, 15. Przerwa: dni 22–28.
+    """
+    user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+    cycles = db.query(
+        "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
+    )
+    starts = [c["start_date"] for c in cycles]
+    on_patch = bool(user["patch_mode"])
+    result = {"date": day, "on_patch": on_patch, "phase": None}
+    if not on_patch:
+        result.update(
+            {
+                "needs_change": False,
+                "applied": False,
+                "applied_at": None,
+                "patch_number": None,
+                "days_to_change": None,
+                "message": None,
+            }
+        )
+        return result
+    today = cyc.parse_date(day)
+    past = [cyc.parse_date(s) for s in starts if cyc.parse_date(s) <= today]
+    if not past:
+        result.update(
+            {
+                "needs_change": False,
+                "applied": False,
+                "applied_at": None,
+                "patch_number": None,
+                "days_to_change": None,
+                "message": "Zaznacz początek okresu, żeby śledzić plastry.",
+            }
+        )
+        return result
+    cycle_start = past[-1]
+    cycle_day = (today - cycle_start).days + 1
+    cd = ((cycle_day - 1) % 28) + 1
+    log = db.query_one(
+        "SELECT * FROM patch_logs WHERE user_id = ? AND date = ?", (user_id, day)
+    )
+    applied_at = log["applied_at"] if log else None
+    if cd == 1:
+        phase, needs, number = "change", True, 1
+        message = "Naklej nowy plaster dziś"
+    elif cd == 8:
+        phase, needs, number = "change", True, 2
+        message = "Zmień plaster — naklej nowy dziś (2. tydzień)"
+    elif cd == 15:
+        phase, needs, number = "change", True, 3
+        message = "Zmień plaster — naklej nowy dziś (3. tydzień)"
+    elif cd == 22:
+        phase, needs, number = "remove", True, 0
+        message = "Zdejmij plaster — dziś zaczyna się przerwa"
+    elif 23 <= cd <= 28:
+        phase, needs, number = "break", False, 0
+        message = "Przerwa — bez plastra"
+    elif 2 <= cd <= 7:
+        phase, needs, number = "worn", False, 1
+        message = f"Plaster nr 1 założony · zmiana za {8 - cd} dni"
+    elif 9 <= cd <= 14:
+        phase, needs, number = "worn", False, 2
+        message = f"Plaster nr 2 założony · zmiana za {15 - cd} dni"
+    else:
+        phase, needs, number = "worn", False, 3
+        message = f"Plaster nr 3 założony · zmiana za {22 - cd} dni"
+    result.update(
+        {
+            "needs_change": needs,
+            "applied": bool(log),
+            "applied_at": applied_at,
+            "patch_number": number,
+            "phase": phase,
+            "confirm_label": "Zdjęłam" if phase == "remove" else "Nakleiłam",
+            "days_to_change": None,
+            "message": message,
+            "cycle_day": cycle_day,
+            "cycle_start": cycle_start.isoformat(),
+        }
+    )
+    if applied_at:
+        if phase == "remove":
+            result["message"] = f"Odnotowano (zdjęcie plastra) o {applied_at}"
+        else:
+            result["message"] = f"Naklejony o {applied_at}"
+    return result
+
+
 def _chat_context(user_id):
     """Buduje kontekst z kalendarza użytkownika, by asystent mógł podać konkretne daty."""
     from datetime import timedelta
@@ -823,13 +1023,15 @@ def _chat_context(user_id):
     )
     user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
     starts = [c["start_date"] for c in cycles]
+    method = _user_method(user)
     pred = cyc.build_calendar(
         starts,
         cycle_length=user["cycle_length_default"],
         period_length=user["period_length_default"],
-        pills=bool(user["pill_mode"]),
-        pill_cycle=user["pill_cycle_days"] or 21,
-        pill_break=_pill_break_value(user),
+        pills=method["on"],
+        pill_cycle=method["cycle"],
+        pill_break=method["break"],
+        method=method["method"],
     )
     today = date.today()
     cycle_day = None
@@ -846,6 +1048,7 @@ def _chat_context(user_id):
         ends = [c["end_date"] for c in cycles if c["end_date"]]
         today_type = cyc.day_type_for(today.isoformat(), starts, ends, pred)
 
+    on_pills = bool(user["pill_mode"])
     pill_name = user["pill_name"] or ""
     pill_type = None
     if pill_name:
@@ -857,13 +1060,24 @@ def _chat_context(user_id):
         except ImportError:
             pass
 
+    patch_name = user["patch_name"] or ""
+    patch_status = None
+    if user.get("patch_mode"):
+        try:
+            patch_status = _patch_status(user_id, today.isoformat())
+        except Exception:
+            patch_status = None
+
     return {
-        "on_pills": bool(user["pill_mode"]),
+        "method": method["method"],
+        "on_pills": on_pills,
         "pill_name": pill_name,
         "pill_type": pill_type,
         "pill_cycle_days": user["pill_cycle_days"] or 21,
         "pill_break_days": (user["pill_break_days"] if user["pill_break_days"] is not None else 7),
         "pill_time": user["pill_time"] or "12:00",
+        "patch_name": patch_name,
+        "patch_status": patch_status,
         "next_period_start": pred.get("next_period_start"),
         "ovulation_date": pred.get("ovulation_date"),
         "fertile_start": pred.get("fertile_start"),

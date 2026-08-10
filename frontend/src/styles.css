@@ -3173,6 +3173,24 @@ select {
   align-items: center;
   gap: 6px;
   flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  border-radius: 14px;
+  -webkit-tap-highlight-color: transparent;
+}
+.week-day:active {
+  transform: scale(0.92);
+}
+.week-day.active .wd-num {
+  box-shadow: inset 0 0 0 2px var(--pink-500);
+  color: var(--pink-600);
+  font-weight: 800;
+}
+.week-day.active.today .wd-num {
+  box-shadow: inset 0 0 0 2px #fff, 0 6px 16px rgba(201, 58, 110, 0.35);
 }
 .wd-letter {
   font-size: 12px;
@@ -3325,6 +3343,106 @@ select {
   font-weight: 700;
   padding: 0;
   cursor: pointer;
+}
+
+.today-back {
+  margin-right: 8px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--pink-600);
+  border-color: var(--pink-300);
+  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cmark .hicon,
+.ymark .hicon {
+  color: #e0245e;
+  flex-shrink: 0;
+}
+.cmark .picon,
+.ymark .picon {
+  color: #8a5cf6;
+  flex-shrink: 0;
+}
+
+.method-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 4px 16px 16px;
+}
+.method-chip {
+  border: 1.5px solid var(--line);
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.method-chip.on {
+  border-color: var(--pink-500);
+  background: var(--pink-100);
+  color: var(--pink-700);
+}
+
+.pill-details {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+.pill-details summary {
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+}
+.pill-details summary::-webkit-details-marker {
+  display: none;
+}
+.pill-details summary::after {
+  content: "▾";
+  float: right;
+  color: var(--ink-2);
+  transition: transform 0.15s;
+}
+.pill-details[open] summary::after {
+  transform: rotate(180deg);
+}
+.pill-kb {
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+.pill-kb b {
+  display: block;
+  font-size: 12.5px;
+  margin-bottom: 4px;
+}
+.pill-kb p {
+  margin: 0;
+}
+.pill-info {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--pink-100);
+  border-radius: 14px;
+}
+.pill-info b {
+  font-size: 13.5px;
+}
+.pill-info p {
+  margin: 4px 0 0;
 }
 
 .inspo-scroll {

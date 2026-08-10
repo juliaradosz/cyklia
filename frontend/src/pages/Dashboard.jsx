@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [cycles, setCycles] = useState([]);
   const [inspos, setInspos] = useState([]);
   const [pillLog, setPillLog] = useState(null);
+  const [patchLog, setPatchLog] = useState(null);
   const [pillTimeInput, setPillTimeInput] = useState(nowHM());
   const [sheet, setSheet] = useState(null);
   const [sexSel, setSexSel] = useState([]);
@@ -43,20 +44,34 @@ export default function Dashboard() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const today = todayISO();
+  const [activeDay, setActiveDay] = useState(today);
+
+  useEffect(() => {
+    setActiveDay(today);
+  }, [today, data]);
 
   useEffect(() => {
     (async () => {
       try {
+        const method = data?.prediction?.method;
         const [e, c, ins, pl] = await Promise.all([
           api(`/entries/${today}`).catch(() => null),
           api("/cycles").catch(() => []),
           api("/inspirations").catch(() => []),
-          api("/pills/log").catch(() => null),
+          method === "patch"
+            ? api("/patch/log").catch(() => null)
+            : api("/pills/log").catch(() => null),
         ]);
         setEntry(e);
         setCycles(c || []);
         setInspos(ins || []);
-        setPillLog(pl);
+        if (method === "patch") {
+          setPillLog(null);
+          setPatchLog(pl);
+        } else {
+          setPillLog(pl);
+          setPatchLog(null);
+        }
         try {
           const sex = e?.sex ? JSON.parse(e.sex) : [];
           setSexSel(SEX_ACT.filter((a) => sex.includes(a)));
@@ -74,6 +89,7 @@ export default function Dashboard() {
 
   const pred = data.prediction;
   const onPills = !!pred.on_pills;
+  const patchMode = pred.method === "patch";
   const todayType = data.days[today] || "normal";
 
   const currentPeriod = cycles.find(
@@ -84,12 +100,6 @@ export default function Dashboard() {
     a.start_date.localeCompare(b.start_date)
   );
   const lastStart = sortedStarts.length ? sortedStarts[sortedStarts.length - 1].start_date : null;
-  const periodDay = currentPeriod
-    ? daysBetween(currentPeriod.start_date, today) + 1
-    : null;
-  const cycleDay = lastStart && lastStart <= today
-    ? daysBetween(lastStart, today) + 1
-    : null;
 
   let cycleLen = pred.cycle_length;
   if (sortedStarts.length >= 2) {
@@ -99,14 +109,24 @@ export default function Dashboard() {
     if (diff > 0) cycleLen = diff;
   }
 
+  const isTodayView = activeDay === today;
+  const activeType = data.days[activeDay] || "normal";
+  const activePeriod = cycles.find(
+    (c) => c.start_date <= activeDay && (!c.end_date || c.end_date >= activeDay)
+  );
+  const actPrevStart = sortedStarts.filter((s) => s.start_date <= activeDay).pop();
+  const periodDay = activePeriod
+    ? daysBetween(activePeriod.start_date, activeDay) + 1
+    : null;
+  const cycleDay = actPrevStart ? daysBetween(actPrevStart.start_date, activeDay) + 1 : null;
   const countdown = pred.next_period_start
-    ? daysBetween(today, pred.next_period_start)
+    ? daysBetween(activeDay, pred.next_period_start)
     : null;
 
   let phaseLabel = "Śledzenie";
-  if (todayType === "period") phaseLabel = "Okres";
-  else if (todayType === "ovulation") phaseLabel = "Owulacja";
-  else if (todayType === "fertile") phaseLabel = "Dni płodne";
+  if (activeType === "period") phaseLabel = "Okres";
+  else if (activeType === "ovulation") phaseLabel = "Owulacja";
+  else if (activeType === "fertile") phaseLabel = "Dni płodne";
   else if (onPills) phaseLabel = "Aktywne dni";
   else if (cycleDay && pred.cycle_length) {
     phaseLabel =
@@ -118,17 +138,22 @@ export default function Dashboard() {
     : cycleDay
     ? `Dzień ${cycleDay} cyklu`
     : "Zacznij śledzenie";
-  const noteLine = periodDay
-    ? `Cykl trwał ${cycleLen} dni`
-    : countdown !== null
-    ? countdown > 0
-      ? `${countdown} dni do okresu`
-      : countdown === 0
-      ? "okres — dziś!"
-      : `${-countdown} dni po terminie`
-    : onPills
-    ? "Kolejna przerwa wg kalendarza"
-    : "Dodaj okres w kalendarzu";
+
+  let noteLine;
+  if (periodDay === 1) {
+    noteLine = `Cykl trwał ${cycleLen} dni`;
+  } else if (countdown !== null) {
+    noteLine =
+      countdown > 0
+        ? `${countdown} dni do okresu`
+        : countdown === 0
+        ? "okres — dziś!"
+        : `${-countdown} dni po terminie`;
+  } else if (onPills) {
+    noteLine = "Kolejna przerwa wg kalendarza";
+  } else {
+    noteLine = "Dodaj okres w kalendarzu";
+  }
 
   const week = weekOf(today);
 
@@ -212,11 +237,39 @@ export default function Dashboard() {
     }
   }
 
+  async function applyPatch() {
+    try {
+      const pl = await api("/patch/log", { method: "POST", body: {} });
+      setPatchLog(pl);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function undoPatch() {
+    try {
+      const pl = await api("/patch/log", { method: "DELETE", body: {} });
+      setPatchLog(pl);
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
     <div className="dash">
       <div className="dash-hero">
         <div className="dash-top">
-          <div className="dash-date">{dayMonthPL(today)}</div>
+          <div className="dash-date">
+            {activeDay !== today && (
+              <button
+                className="btn small ghost today-back"
+                onClick={() => setActiveDay(today)}
+              >
+                <Icon name="x" size={14} /> dziś
+              </button>
+            )}
+            {dayMonthPL(activeDay)}
+          </div>
           <button
             className="dash-cal"
             onClick={() => navigate("/kalendarz")}
@@ -229,14 +282,22 @@ export default function Dashboard() {
           {week.map((d, i) => {
             const isPeriodDay = data.days[d] === "period";
             const isToday = d === today;
+            const isActive = d === activeDay;
             const num = Number(d.slice(8, 10));
             return (
-              <div key={d} className={`week-day${isToday ? " today" : ""}`}>
+              <button
+                key={d}
+                className={`week-day${isToday ? " today" : ""}${
+                  isActive ? " active" : ""
+                }`}
+                onClick={() => setActiveDay(d)}
+                aria-label={dayMonthPL(d)}
+              >
                 <span className="wd-letter">{WEEK_LETTERS[i]}</span>
                 <span className={`wd-num${isPeriodDay ? " period" : ""}`}>
                   {num}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -270,7 +331,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {onPills && pillLog && pillLog.needs_log && (
+      {isTodayView && !patchMode && onPills && pillLog && pillLog.needs_log && (
         <div className="dash-pill">
           <div className="dp-ico">
             <Icon name="pill" size={18} />
@@ -305,6 +366,40 @@ export default function Dashboard() {
         </div>
       )}
 
+      {isTodayView && patchMode && patchLog && (
+        <div className="dash-pill">
+          <div className="dp-ico">
+            <Icon name="pill" size={18} />
+          </div>
+          {patchLog.needs_change ? (
+            patchLog.applied ? (
+              <div className="dp-body">
+                <b>Odnotowano</b>
+                <span className="dp-sub">{patchLog.message}</span>
+                <button className="dp-undo" onClick={undoPatch}>
+                  Cofnij
+                </button>
+              </div>
+            ) : (
+              <div className="dp-body">
+                <b>Dziś potrzebny twój plaster</b>
+                <span className="dp-sub">{patchLog.message}</span>
+                <div className="dp-log">
+                  <button className="btn small" onClick={applyPatch}>
+                    {patchLog.confirm_label}
+                  </button>
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="dp-body">
+              <b>Plaster antykoncepcyjny</b>
+              <span className="dp-sub">{patchLog.message}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="section-head">
         <h2>Moje codzienne inspiracje</h2>
       </div>
@@ -330,7 +425,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {!currentPeriod && (
+      {isTodayView && !currentPeriod && (
         <button
           className="btn ghost block mt"
           onClick={async () => {

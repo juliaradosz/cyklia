@@ -11,9 +11,15 @@ export default function ProfilePage() {
   const [name, setName] = useState(user?.display_name || "");
   const [cycle, setCycle] = useState(user?.cycle_length_default || 28);
   const [period, setPeriod] = useState(user?.period_length_default || 5);
-  const [pillMode, setPillMode] = useState(!!user?.pill_mode);
+  const [method, setMethod] = useState(
+    user?.patch_mode ? "patch" : user?.pill_mode ? "pill" : "none"
+  );
+  const pillMode = method === "pill";
+  const patchMode = method === "patch";
   const [pills, setPills] = useState([]);
+  const [patchesData, setPatchesData] = useState(null);
   const [pillName, setPillName] = useState(user?.pill_name || "");
+  const [patchName, setPatchName] = useState(user?.patch_name || "");
   const [pillCycle, setPillCycle] = useState(user?.pill_cycle_days || 21);
   const [pillBreak, setPillBreak] = useState(user?.pill_break_days || 7);
   const [pillTime, setPillTime] = useState(user?.pill_time || "12:00");
@@ -22,6 +28,9 @@ export default function ProfilePage() {
   useEffect(() => {
     api("/pills")
       .then(setPills)
+      .catch(() => {});
+    api("/patches")
+      .then(setPatchesData)
       .catch(() => {});
   }, []);
 
@@ -32,6 +41,10 @@ export default function ProfilePage() {
       setPillCycle(p.active);
       setPillBreak(p.break);
     }
+  }
+
+  function choosePatch(name) {
+    setPatchName(name);
   }
 
   async function save(extra = {}) {
@@ -46,6 +59,8 @@ export default function ProfilePage() {
         pill_cycle_days: pillMode ? Number(pillCycle) : 21,
         pill_break_days: pillMode ? Number(pillBreak) : 7,
         pill_time: pillMode ? pillTime : "12:00",
+        patch_mode: patchMode,
+        patch_name: patchMode ? patchName : "",
         ...extra,
       },
     });
@@ -58,6 +73,8 @@ export default function ProfilePage() {
       pill_cycle_days: pillMode ? Number(pillCycle) : 21,
       pill_break_days: pillMode ? Number(pillBreak) : 7,
       pill_time: pillMode ? pillTime : "12:00",
+      patch_mode: patchMode,
+      patch_name: patchMode ? patchName : "",
       ...extra,
     });
     setSaved(true);
@@ -129,13 +146,27 @@ export default function ProfilePage() {
 
         <div className="settings-group" style={{ padding: 0 }}>
           <div className="set-switch">
-            <span className="sw-label">Stosuję tabletki antykoncepcyjne</span>
-            <input
-              type="checkbox"
-              className="switch"
-              checked={pillMode}
-              onChange={(e) => setPillMode(e.target.checked)}
-            />
+            <span className="sw-label">Jak się zabezpieczasz?</span>
+          </div>
+          <div className="method-grid">
+            <button
+              className={`method-chip${method === "none" ? " on" : ""}`}
+              onClick={() => setMethod("none")}
+            >
+              Bez hormonów
+            </button>
+            <button
+              className={`method-chip${method === "pill" ? " on" : ""}`}
+              onClick={() => setMethod("pill")}
+            >
+              Tabletki
+            </button>
+            <button
+              className={`method-chip${method === "patch" ? " on" : ""}`}
+              onClick={() => setMethod("patch")}
+            >
+              Plastry
+            </button>
           </div>
         </div>
 
@@ -197,6 +228,63 @@ export default function ProfilePage() {
               Schematy: 21+7, 24+4, 26+2 albo 28+0 (bez przerwy). Sprawdź
               zawsze ulotkę — lista ma charakter informacyjny.
             </p>
+          </div>
+        )}
+
+        {patchMode && (
+          <div className="j-section">
+            <p className="muted" style={{ marginTop: 0, fontSize: 12.5 }}>
+              W trybie plastrów kalendarz nie pokazuje owulacji ani dni
+              płodnych. Cyklia przypomni o zmianie plastra: nowy naklejasz
+              w 1., 8. i 15. dniu cyklu, a w 22. dniu robisz 7-dniową przerwę.
+            </p>
+            <div className="field">
+              <label>Twój plaster (opcjonalnie)</label>
+              <select
+                value={patchName}
+                onChange={(e) => choosePatch(e.target.value)}
+              >
+                <option value="">Wybierz z listy…</option>
+                {(patchesData?.patches || []).map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name} ({p.active}+{p.break})
+                  </option>
+                ))}
+              </select>
+            </div>
+            {patchName &&
+              (() => {
+                const found = (patchesData?.patches || []).find(
+                  (p) => p.name === patchName
+                );
+                return found ? (
+                  <div className="pill-info">
+                    <b>{found.name}</b>
+                    <p className="muted" style={{ fontSize: 12.5 }}>
+                      {found.hormones}
+                    </p>
+                    <p className="muted" style={{ fontSize: 12.5 }}>
+                      {found.description}
+                    </p>
+                  </div>
+                ) : null;
+              })()}
+            <p className="muted" style={{ fontSize: 11 }}>
+              Plaster naklejasz na skórę (pośladek, brzuch lub ramię) raz
+              w tygodniu przez 3 tygodnie, potem 7 dni przerwy. Zawsze
+              sprawdzaj ulotkę swojego preparatu.
+            </p>
+            <details className="pill-details">
+              <summary>Wiedza o plastrach</summary>
+              {(patchesData?.knowledge || []).map((k) => (
+                <div className="pill-kb" key={k.title}>
+                  <b>{k.title}</b>
+                  <p className="muted" style={{ fontSize: 12.5 }}>
+                    {k.body}
+                  </p>
+                </div>
+              ))}
+            </details>
           </div>
         )}
 

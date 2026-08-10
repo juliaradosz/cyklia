@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS users (
     pill_break_days INTEGER DEFAULT 7,
     pill_name TEXT,
     pill_time TEXT DEFAULT '12:00',
+    patch_mode INTEGER DEFAULT 0,
+    patch_name TEXT,
     created_at TEXT NOT NULL
 );
 
@@ -59,6 +61,16 @@ CREATE TABLE IF NOT EXISTS pill_logs (
     user_id INTEGER NOT NULL,
     date TEXT NOT NULL,
     taken_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, date),
+    FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS patch_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    applied_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     UNIQUE (user_id, date),
     FOREIGN KEY (user_id) REFERENCES users (id)
@@ -145,6 +157,9 @@ MIGRATIONS = [
     ("ALTER TABLE users ADD COLUMN pill_break_days INTEGER DEFAULT 7", "pill_break_days"),
     ("ALTER TABLE users ADD COLUMN pill_name TEXT", "pill_name"),
     ("ALTER TABLE users ADD COLUMN pill_time TEXT DEFAULT '12:00'", "pill_time"),
+    # tryb plastrow antykoncepcyjnych (users)
+    ("ALTER TABLE users ADD COLUMN patch_mode INTEGER DEFAULT 0", "patch_mode"),
+    ("ALTER TABLE users ADD COLUMN patch_name TEXT", "patch_name"),
     # rozszerzone pola dziennika (entries)
     ("ALTER TABLE entries ADD COLUMN libido TEXT", "libido"),
     ("ALTER TABLE entries ADD COLUMN stress INTEGER", "stress"),
@@ -194,7 +209,7 @@ def migrate(conn=None):
     acols = {r["name"] for r in conn.execute("PRAGMA table_info(articles)")}
     mcols = {r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)")}
     for sql, col in MIGRATIONS:
-        if col in {"pill_mode", "pill_cycle_days", "pill_break_days", "pill_name", "pill_time"}:
+        if col in {"pill_mode", "pill_cycle_days", "pill_break_days", "pill_name", "pill_time", "patch_mode", "patch_name"}:
             cols_set = cols
         elif col in {"libido", "stress", "mucus", "weight", "steps", "sleep_quality", "sex", "bleeding", "digestive"}:
             cols_set = ecols

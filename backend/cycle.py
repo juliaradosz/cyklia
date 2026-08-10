@@ -29,13 +29,16 @@ def build_calendar(
     pills=False,
     pill_cycle=21,
     pill_break=7,
+    method=None,
 ):
     """Zwraca prognozę na podstawie listy dat rozpoczęcia okresów.
 
     pills=True → tryb antykoncepcji hormonalnej: brak owulacji i dni płodnych,
-    kolejna miesiączka przewidywana w przerwie między blistrami.
+    kolejna miesiączka przewidywana w przerwie między blistrami / plastrami.
+    method: "pill" | "patch" | None — typ antykoncepcji.
     """
     start_dates = sorted(set(parse_date(s) if isinstance(s, str) else s for s in start_dates))
+    per = int(period_length or 5)
 
     if pills:
         total = max(int(pill_cycle), 1) + max(int(pill_break), 0)
@@ -43,11 +46,13 @@ def build_calendar(
             return {
                 "has_data": False,
                 "on_pills": True,
+                "method": method,
                 "next_period_start": None,
                 "ovulation_date": None,
                 "fertile_start": None,
                 "fertile_end": None,
                 "cycle_length": total,
+                "period_length": per,
                 "pill_break_days": int(pill_break),
             }
         last = start_dates[-1]
@@ -58,11 +63,13 @@ def build_calendar(
         return {
             "has_data": True,
             "on_pills": True,
+            "method": method,
             "next_period_start": iso(next_start),
             "ovulation_date": None,
             "fertile_start": None,
             "fertile_end": None,
             "cycle_length": total,
+            "period_length": per,
             "pill_break_days": int(pill_break),
         }
 
@@ -72,11 +79,13 @@ def build_calendar(
         return {
             "has_data": False,
             "on_pills": False,
+            "method": None,
             "next_period_start": None,
             "ovulation_date": None,
             "fertile_start": None,
             "fertile_end": None,
             "cycle_length": cycle,
+            "period_length": per,
             "pill_break_days": None,
         }
 
@@ -94,11 +103,13 @@ def build_calendar(
     return {
         "has_data": True,
         "on_pills": False,
+        "method": None,
         "next_period_start": iso(next_start),
         "ovulation_date": iso(ovulation),
         "fertile_start": iso(fertile_start),
         "fertile_end": iso(fertile_end),
         "cycle_length": cycle,
+        "period_length": per,
         "pill_break_days": None,
     }
 
