@@ -97,14 +97,15 @@ export default function Dashboard() {
   const patchMode = pred.method === "patch";
   const todayType = data.days[today] || "normal";
 
+  const sortedStarts = [...cycles].sort((a, b) =>
+    a.start_date.localeCompare(b.start_date)
+  );
+
   const currentPeriod =
     todayType === "period"
       ? sortedStarts.filter((s) => s.start_date <= today).pop() || null
       : null;
 
-  const sortedStarts = [...cycles].sort((a, b) =>
-    a.start_date.localeCompare(b.start_date)
-  );
   const lastStart = sortedStarts.length ? sortedStarts[sortedStarts.length - 1].start_date : null;
 
   let cycleLen = pred.cycle_length;
