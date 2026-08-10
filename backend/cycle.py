@@ -144,15 +144,20 @@ def build_calendar(
 
 
 def day_type_for(day, cycle_starts, period_end_dates, prediction):
-    """Klasyfikuje dzień: okres / płodny / owulacja / normalny."""
+    """Klasyfikuje dzień: okres / płodny / owulacja / normalny.
+
+    period_end_dates[i] odpowiada cycle_starts[i]; wartość pusta (None / "")
+    oznacza otwarty cykl bez zakończenia (okres szacowany na period_length dni).
+    """
     day = parse_date(day)
-    for s in cycle_starts:
+    per = int(prediction.get("period_length") or 5)
+    for i, s in enumerate(cycle_starts):
         s = parse_date(s)
-        matching_end = next(
-            (parse_date(x) for x in period_end_dates if parse_date(x) >= s),
-            None,
-        )
-        e = matching_end or s + timedelta(days=4)
+        e = None
+        if i < len(period_end_dates) and period_end_dates[i]:
+            e = parse_date(period_end_dates[i])
+        if e is None:
+            e = s + timedelta(days=per - 1)
         if s <= day <= e:
             return "period"
 

@@ -65,7 +65,7 @@ def _phase(day, starts, ends, prediction, period_length, on_pills):
     day_type = cyc.day_type_for(
         day.isoformat(),
         [s.isoformat() for s in starts],
-        [e.isoformat() for e in ends],
+        [e.isoformat() if e is not None else "" for e in ends],
         prediction,
     )
     if on_pills:
@@ -115,7 +115,10 @@ def predict_feel(user_id, day):
         "SELECT * FROM entries WHERE user_id = ? ORDER BY date", (user_id,)
     )
     starts = sorted({cyc.parse_date(c["start_date"]) for c in cycles})
-    ends = [cyc.parse_date(c["end_date"]) for c in cycles if c["end_date"]]
+    ends = [
+        cyc.parse_date(c["end_date"]) if c["end_date"] else None
+        for c in sorted(cycles, key=lambda x: x["start_date"])
+    ]
     pred = _prediction(user, [s.isoformat() for s in starts])
     method = _user_method(user)
     on_pills = method["on"]

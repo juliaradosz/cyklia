@@ -467,7 +467,7 @@ def create_app():
         )
         user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
         starts = [c["start_date"] for c in cycles]
-        ends = [c["end_date"] for c in cycles if c["end_date"]]
+        ends = [c["end_date"] or None for c in cycles]
         method = _user_method(user)
         pred = cyc.build_calendar(
             starts,
@@ -893,7 +893,7 @@ def _pill_status(user_id, day):
         "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
     )
     starts = [c["start_date"] for c in cycles]
-    ends = [c["end_date"] for c in cycles if c["end_date"]]
+    ends = [c["end_date"] or None for c in cycles]
     on_pills = bool(user["pill_mode"])
     pred = cyc.build_calendar(
         starts,
@@ -1095,7 +1095,7 @@ def _chat_context(user_id):
         days_to_period = (nxt - today).days
     today_type = None
     if starts or pred.get("on_pills"):
-        ends = [c["end_date"] for c in cycles if c["end_date"]]
+        ends = [c["end_date"] or None for c in cycles]
         today_type = cyc.day_type_for(today.isoformat(), starts, ends, pred)
 
     on_pills = bool(user["pill_mode"])
