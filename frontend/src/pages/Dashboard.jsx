@@ -11,7 +11,7 @@ import {
   nowHM,
 } from "../utils.js";
 import { api } from "../api/client.js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "../components/Icon.jsx";
 
 const SEX_ACT = [
@@ -45,9 +45,14 @@ export default function Dashboard() {
   const [periodEnd, setPeriodEnd] = useState("");
   const today = todayISO();
   const [activeDay, setActiveDay] = useState(today);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [slideDir, setSlideDir] = useState("");
+  const touchStartX = useRef(null);
 
   useEffect(() => {
     setActiveDay(today);
+    setWeekOffset(0);
+    setSlideDir("");
   }, [today, data]);
 
   useEffect(() => {
@@ -143,32 +148,48 @@ export default function Dashboard() {
     dayLine = `Dzień ${periodDay}`;
     if (periodDay === 1) {
       noteLine = `Cykl trwał ${cycleLen} dni`;
-    } else if (countdown !== null) {
-      noteLine =
-        countdown === 0 ? "okres — dziś!" : `${countdown} dni do okresu`;
     } else if (onPills) {
       noteLine = "Kolejna przerwa wg kalendarza";
     } else {
-      noteLine = "Dodaj okres w kalendarzu";
+      noteLine = "Okres trwa";
     }
   } else if (countdown !== null) {
-    phaseLabel = "Okres przewidywany";
+    phaseLabel = phaseDetail || "Śledzenie";
     dayLine =
       countdown > 0
-        ? `za ${countdown} dni`
+        ? `${countdown} dni do okresu`
         : countdown === 0
-        ? "dziś!"
+        ? "okres — dziś!"
         : `${-countdown} dni po terminie`;
     noteLine = cycleDay
-      ? `Dzień ${cycleDay} cyklu${phaseDetail ? " · " + phaseDetail : ""}`
-      : phaseDetail || "Dodaj okres w kalendarzu";
+      ? `Dzień ${cycleDay} cyklu`
+      : "Dodaj okres w kalendarzu";
   } else {
     phaseLabel = "Śledzenie";
     dayLine = cycleDay ? `Dzień ${cycleDay} cyklu` : "Zacznij śledzenie";
     noteLine = onPills ? "Kolejna przerwa wg kalendarza" : "Dodaj okres w kalendarzu";
   }
 
-  const week = weekOf(today);
+  const week = weekOf(addDays(today, weekOffset * 7));
+
+  function shiftWeek(dir) {
+    setWeekOffset((o) => o + dir);
+    setActiveDay((d) => addDays(d, dir * 7));
+    setSlideDir(dir === 1 ? "right" : "left");
+  }
+
+  function onTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+
+  function onTouchEnd(e) {
+    const start = touchStartX.current;
+    touchStartX.current = null;
+    if (start == null) return;
+    const dx = e.changedTouches[0].clientX - start;
+    if (Math.abs(dx) < 60) return;
+    shiftWeek(dx < 0 ? 1 : -1);
+  }
 
   function openSex() {
     setSheet("sex");
@@ -273,25 +294,52 @@ export default function Dashboard() {
       <div className="dash-hero">
         <div className="dash-top">
           <div className="dash-date">
-            {activeDay !== today && (
+            {(weekOffset !== 0 || activeDay !== today) && (
               <button
                 className="btn small ghost today-back"
-                onClick={() => setActiveDay(today)}
+                onClick={() => {
+                  setWeekOffset(0);
+                  setActiveDay(today);
+                  setSlideDir("");
+                }}
               >
                 <Icon name="x" size={14} /> dziś
               </button>
             )}
             {dayMonthPL(activeDay)}
           </div>
-          <button
-            className="dash-cal"
-            onClick={() => navigate("/kalendarz")}
-            aria-label="Kalendarz"
-          >
-            <Icon name="calendar" size={20} />
-          </button>
+          <div className="dash-top-right">
+            <div className="week-nav">
+              <button
+                className="week-arrow"
+                onClick={() => shiftWeek(-1)}
+                aria-label="Poprzedni tydzień"
+              >
+                <Icon name="chevron-left" size={18} />
+              </button>
+              <button
+                className="week-arrow"
+                onClick={() => shiftWeek(1)}
+                aria-label="Następny tydzień"
+              >
+                <Icon name="chevron-right" size={18} />
+              </button>
+            </div>
+            <button
+              className="dash-cal"
+              onClick={() => navigate("/kalendarz")}
+              aria-label="Kalendarz"
+            >
+              <Icon name="calendar" size={20} />
+            </button>
+          </div>
         </div>
-        <div className="week-row">
+        <div
+          className={`week-row${slideDir ? " slide " + slideDir : ""}`}
+          key={weekOffset}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
           {week.map((d, i) => {
             const isPeriodDay = data.days[d] === "period";
             const isToday = d === today;
