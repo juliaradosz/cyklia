@@ -146,7 +146,7 @@ export default function Dashboard() {
     phaseLabel = "Śledzenie";
     dayLine =
       countdown > 0
-        ? `Okres za ${countdown} dni`
+        ? `${countdown} ${countdown === 1 ? "dzień" : "dni"} do okresu`
         : countdown === 0
         ? "okres — dziś!"
         : `${-countdown} dni po terminie`;
