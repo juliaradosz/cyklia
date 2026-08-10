@@ -36,7 +36,7 @@ def _build_stats(user_id):
         pred._to_date(c["end_date"]) if c["end_date"] else None
         for c in sorted(cycles, key=lambda x: x["start_date"])
     ]
-    pred_obj = pred._prediction(user, [s.isoformat() for s in starts])
+    pred_obj = pred._prediction(user, [s.isoformat() for s in starts], user_id=user_id)
     on_pills = bool(pred._user_method(user)["on"])
     period_len = user["period_length_default"]
 

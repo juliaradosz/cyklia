@@ -10,7 +10,7 @@ w groq_key.py / zmiennych środowiskowych), a bez niego — lokalnie.
 """
 import json
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import database as db
 import cycle as cyc
@@ -46,8 +46,25 @@ def _user_method(user):
     return {"on": False, "method": None, "cycle": 21, "break": 7}
 
 
-def _prediction(user, starts):
+def _first_pill_date(user_id, user):
+    """Pierwsza zarejestrowana tabletka bieżącego blistra (kotwica
+    harmonogramu); brak logów w ostatnim cyklu → None."""
+    active = int(user.get("pill_cycle_days") or 21)
+    brk = user.get("pill_break_days")
+    total = active + (brk if brk is not None else 7)
+    today = datetime.now().strftime("%Y-%m-%d")
+    row = db.query_one(
+        "SELECT MIN(date) AS d FROM pill_logs WHERE user_id = ? AND date <= ? AND date > ?",
+        (user_id, today, (datetime.now() - timedelta(days=total)).strftime("%Y-%m-%d")),
+    )
+    return row["d"] if row and row["d"] else None
+
+
+def _prediction(user, starts, user_id=None):
     method = _user_method(user)
+    pill_start = method.get("start")
+    if user_id and method["on"]:
+        pill_start = _first_pill_date(user_id, user) or method.get("start")
     return cyc.build_calendar(
         starts,
         cycle_length=user["cycle_length_default"],
@@ -56,7 +73,7 @@ def _prediction(user, starts):
         pill_cycle=method["cycle"],
         pill_break=method["break"],
         method=method["method"],
-        pill_start=method.get("start"),
+        pill_start=pill_start,
     )
 
 
@@ -119,7 +136,7 @@ def predict_feel(user_id, day):
         cyc.parse_date(c["end_date"]) if c["end_date"] else None
         for c in sorted(cycles, key=lambda x: x["start_date"])
     ]
-    pred = _prediction(user, [s.isoformat() for s in starts])
+    pred = _prediction(user, [s.isoformat() for s in starts], user_id=user_id)
     method = _user_method(user)
     on_pills = method["on"]
     period_len = user["period_length_default"]

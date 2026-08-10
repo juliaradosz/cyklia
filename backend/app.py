@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -477,7 +477,7 @@ def create_app():
             pill_cycle=method["cycle"],
             pill_break=method["break"],
             method=method["method"],
-            pill_start=method.get("start"),
+            pill_start=_pill_anchor(user_id, user),
         )
         # zakres widoczny: od pierwszego wpisu do +90 dni w przyszłość
         min_day = min(starts) if starts else date.today().isoformat()
@@ -555,6 +555,7 @@ def create_app():
             pill_cycle=method["cycle"],
             pill_break=method["break"],
             method=method["method"],
+            pill_start=_pill_anchor(user_id, user),
         )
         phase_order = (
             ["Przerwa"]
@@ -628,6 +629,7 @@ def create_app():
             pill_cycle=method["cycle"],
             pill_break=method["break"],
             method=method["method"],
+            pill_start=_pill_anchor(user_id, user),
         )
         target = "any"
         if (
@@ -886,6 +888,24 @@ def _pill_break_value(user):
     return v if v is not None else 7
 
 
+def _pill_anchor(user_id, user):
+    """Kotwica harmonogramu tabletek: pierwsza zarejestrowana tabletka
+    bieżącego blistra (z dziennika). Gdy brak logów w ostatnim cyklu —
+    data rozpoczęcia tabletek z profilu. Dzięki temu wcześniej przyjęta
+    tabletka automatycznie przesuwa prognozę okresu wcześniej."""
+    active = int(user["pill_cycle_days"] or 21)
+    total = active + _pill_break_value(user)
+    row = db.query_one(
+        "SELECT MIN(date) AS d FROM pill_logs "
+        "WHERE user_id = ? AND date <= ? AND date > ?",
+        (user_id, date.today().isoformat(),
+         (date.today() - timedelta(days=total)).isoformat()),
+    )
+    if row and row["d"]:
+        return row["d"]
+    return user.get("pill_start_date") or None
+
+
 def _pill_status(user_id, day):
     """Status tabletki na dany dzień: czy trzeba przyjąć, czy już wzięta, czy spóźniona."""
     user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
@@ -895,6 +915,7 @@ def _pill_status(user_id, day):
     starts = [c["start_date"] for c in cycles]
     ends = [c["end_date"] or None for c in cycles]
     on_pills = bool(user["pill_mode"])
+    anchor = _pill_anchor(user_id, user) if on_pills else None
     pred = cyc.build_calendar(
         starts,
         cycle_length=user["cycle_length_default"],
@@ -902,22 +923,22 @@ def _pill_status(user_id, day):
         pills=on_pills,
         pill_cycle=user["pill_cycle_days"] or 21,
         pill_break=_pill_break_value(user),
-        pill_start=user.get("pill_start_date") or None,
+        pill_start=anchor,
     )
     day_type = cyc.day_type_for(day, starts, ends, pred) if on_pills else "normal"
     needs_log = on_pills and cyc.pill_active(
         day,
-        user.get("pill_start_date") or None,
+        anchor,
         user["pill_cycle_days"] or 21,
         _pill_break_value(user),
     )
     pack_day = None
-    if on_pills and user.get("pill_start_date"):
+    if anchor:
         active_n = user["pill_cycle_days"] or 21
         brk_n = _pill_break_value(user)
         total_n = active_n + brk_n
         if brk_n > 0:
-            pos = (cyc.parse_date(day) - cyc.parse_date(user["pill_start_date"])).days % total_n
+            pos = (cyc.parse_date(day) - cyc.parse_date(anchor)).days % total_n
             if pos < active_n:
                 pack_day = pos + 1
             else:
@@ -1094,6 +1115,7 @@ def _chat_context(user_id):
         pill_cycle=method["cycle"],
         pill_break=method["break"],
         method=method["method"],
+        pill_start=_pill_anchor(user_id, user),
     )
     today = date.today()
     cycle_day = None

@@ -22,6 +22,15 @@ def average_cycle_length(start_dates, default=28):
     return default
 
 
+def next_break_start(anchor, active, total, today):
+    """Początek najbliższej przerwy (okresu) po dacie `today`, gdy kotwica
+    `anchor` to dzień 1 blistra. Przerwy zaczynają się w anchor + active + k*total."""
+    start = anchor + timedelta(days=active)
+    while start <= today:
+        start += timedelta(days=total)
+    return start
+
+
 def build_calendar(
     start_dates,
     cycle_length=None,
@@ -48,14 +57,13 @@ def build_calendar(
         active = max(int(pill_cycle), 1)
         brk = max(int(pill_break), 0)
         total = active + brk
-        if start_dates:
-            # Okres przewidywany wyłącznie z zarejestrowanych cykli
-            # użytkowniczki — data rozpoczęcia tabletek NIE wpływa na okres.
-            last = start_dates[-1]
-            next_start = last + timedelta(days=total)
-            today = date.today()
-            while next_start <= today:
-                next_start += timedelta(days=total)
+        today = date.today()
+        if pill_start:
+            # Kotwica: pierwsza zarejestrowana tabletka bieżącego blistra
+            # (lub data startu z profilu). Następny okres = początek
+            # najbliższej przerwy między blistrami — wcześniej przyjęta
+            # tabletka przesuwa prognozę okresu wcześniej.
+            next_start = next_break_start(parse_date(pill_start), active, total, today)
             return {
                 "has_data": True,
                 "on_pills": True,
@@ -68,17 +76,11 @@ def build_calendar(
                 "period_length": per,
                 "pill_break_days": brk,
             }
-        if pill_start:
-            ps = parse_date(pill_start)
-            today = date.today()
-            idx = (today - ps).days
-            anchor = ps + timedelta(days=(idx // total) * total)
-            active_end = anchor + timedelta(days=active - 1)
-            next_start = (
-                anchor + timedelta(days=total)
-                if today > active_end
-                else anchor + timedelta(days=active)
-            )
+        if start_dates:
+            last = start_dates[-1]
+            next_start = last + timedelta(days=total)
+            while next_start <= today:
+                next_start += timedelta(days=total)
             return {
                 "has_data": True,
                 "on_pills": True,
