@@ -97,9 +97,10 @@ export default function Dashboard() {
   const patchMode = pred.method === "patch";
   const todayType = data.days[today] || "normal";
 
-  const currentPeriod = cycles.find(
-    (c) => c.start_date <= today && (!c.end_date || c.end_date >= today)
-  );
+  const currentPeriod =
+    todayType === "period"
+      ? sortedStarts.filter((s) => s.start_date <= today).pop() || null
+      : null;
 
   const sortedStarts = [...cycles].sort((a, b) =>
     a.start_date.localeCompare(b.start_date)
@@ -116,15 +117,17 @@ export default function Dashboard() {
 
   const isTodayView = activeDay === today;
   const activeType = data.days[activeDay] || "normal";
-  const activePeriod = cycles.find(
-    (c) => c.start_date <= activeDay && (!c.end_date || c.end_date >= activeDay)
-  );
   const actPrevStart = sortedStarts.filter((s) => s.start_date <= activeDay).pop();
-  const periodDay = activePeriod
-    ? daysBetween(activePeriod.start_date, activeDay) + 1
-    : null;
+  const periodStartDate = sortedStarts.filter((s) => s.start_date <= activeDay).pop();
+  const periodDay =
+    activeType === "period" && periodStartDate
+      ? daysBetween(periodStartDate.start_date, activeDay) + 1
+      : null;
   const cycleDay = actPrevStart ? daysBetween(actPrevStart.start_date, activeDay) + 1 : null;
-  const countdown = pred.next_period_start
+  const nextRegStart = sortedStarts.find((s) => s.start_date > activeDay);
+  const countdown = nextRegStart
+    ? daysBetween(activeDay, nextRegStart.start_date)
+    : pred.next_period_start
     ? daysBetween(activeDay, pred.next_period_start)
     : null;
 
@@ -157,7 +160,7 @@ export default function Dashboard() {
     phaseLabel = phaseDetail || "Śledzenie";
     dayLine =
       countdown > 0
-        ? `${countdown} dni do okresu`
+        ? `Okres za ${countdown} dni`
         : countdown === 0
         ? "okres — dziś!"
         : `${-countdown} dni po terminie`;
