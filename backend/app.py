@@ -8,6 +8,8 @@ from flask_cors import CORS
 import auth
 import database as db
 import cycle as cyc
+import predict
+import report
 from chat_bot import reply as chat_reply
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -349,6 +351,34 @@ def create_app():
             "SELECT * FROM entries WHERE user_id = ? AND date = ?", (user_id, day)
         )
         return jsonify(row)
+
+    # ---------- Podpowiedź „jak możesz się dziś czuć” (uczy się z historii) ----------
+
+    @app.get("/api/predict/<day>")
+    @auth.auth_required
+    def predict_day(user_id, day):
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Nieprawidłowa data"}), 400
+        return jsonify(predict.predict_feel(user_id, day))
+
+    # ---------- Raport PDF dla ginekologa ----------
+
+    @app.get("/api/report/pdf")
+    @auth.auth_required
+    def report_pdf(user_id):
+        from flask import send_file
+        import io as _io
+
+        data = report.build_report(user_id)
+        pdf_bytes = report.render_pdf(data)
+        return send_file(
+            _io.BytesIO(pdf_bytes),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="raport-ginekolog.pdf",
+        )
 
     @app.put("/api/entries/<day>")
     @auth.auth_required

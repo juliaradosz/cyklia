@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../api/auth.jsx";
-import { api } from "../api/client.js";
+import { api, download } from "../api/client.js";
 import Icon from "../components/Icon.jsx";
 import StatsPage from "./StatsPage.jsx";
 
@@ -25,6 +25,8 @@ export default function ProfilePage() {
   const [pillBreak, setPillBreak] = useState(user?.pill_break_days || 7);
   const [pillTime, setPillTime] = useState(user?.pill_time || "12:00");
   const [saved, setSaved] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState("");
 
   useEffect(() => {
     api("/pills")
@@ -131,6 +133,30 @@ export default function ProfilePage() {
         <button className="btn block" onClick={() => save()}>
           {saved ? "✓ Zapisano" : "Zapisz ustawienia"}
         </button>
+
+        <button
+          className="btn ghost block"
+          style={{ marginTop: 10 }}
+          disabled={pdfBusy}
+          onClick={async () => {
+            setPdfBusy(true);
+            setPdfError("");
+            try {
+              await download("/report/pdf", "raport-ginekolog.pdf");
+            } catch (e) {
+              setPdfError(e.message || "Nie udało się wygenerować raportu");
+            } finally {
+              setPdfBusy(false);
+            }
+          }}
+        >
+          {pdfBusy ? "Generowanie…" : "Wygeneruj PDF dla ginekologa"}
+        </button>
+        {pdfError && (
+          <p className="muted" style={{ color: "var(--red)", marginTop: 8 }}>
+            {pdfError}
+          </p>
+        )}
       </div>
     );
   }

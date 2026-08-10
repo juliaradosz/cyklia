@@ -82,6 +82,22 @@ export default function JournalPage() {
   const [cycles, setCycles] = useState([]);
   const { data: cal } = useCalendar();
   const goBackToCalendarRef = useRef(false);
+  const [feel, setFeel] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setFeel(null);
+    api(`/predict/${date}`)
+      .then((r) => {
+        if (!cancelled) setFeel(r || { empty: true });
+      })
+      .catch(() => {
+        if (!cancelled) setFeel({ empty: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [date]);
 
   useEffect(() => {
     return () => {
@@ -372,21 +388,51 @@ export default function JournalPage() {
       <form onSubmit={save}>
         <div className="j-section hint-card">
           <span className="js-ico h-ico">
-            <Icon name={hint.icon} size={17} />
+            <Icon name={feel ? "sparkles" : hint.icon} size={17} />
           </span>
           <div className="h-body">
             <div className="h-title">
-              Dziś możesz zauważyć <span className="h-phase">· {hint.title}</span>
+              {date === today ? "Dziś możesz zauważyć" : "W tym dniu możesz zauważyć"}{" "}
+              <span className="h-phase">
+                · {feel ? (feel.phase_name || hint.title) : hint.title}
+              </span>
             </div>
-            <p className="h-text">{hint.text}</p>
-            {hint.items.length > 0 && (
-              <div className="h-chips">
-                {hint.items.map((it) => (
-                  <span key={it} className="h-chip">
-                    {it}
-                  </span>
-                ))}
-              </div>
+            {feel && feel.empty ? (
+              <p className="h-text">
+                Zapisuj objawy i nastrój codziennie, a Cyklia nauczy się Twojego
+                rytmu i podpowie, co zwykle czujesz w tym momencie cyklu.
+              </p>
+            ) : feel ? (
+              <>
+                <p className="h-text">{feel.text}</p>
+                {(feel.symptoms.length > 0 || feel.moods.length > 0) && (
+                  <div className="h-chips">
+                    {feel.symptoms.map((s) => (
+                      <span key={s.name} className="h-chip">
+                        {s.name} <b className="h-pct">{s.pct}%</b>
+                      </span>
+                    ))}
+                    {feel.moods.map((m) => (
+                      <span key={m.name} className="h-chip h-mood">
+                        {MOODS.find((x) => x.key === m.name)?.emoji || "•"} {m.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="h-text">{hint.text}</p>
+                {hint.items.length > 0 && (
+                  <div className="h-chips">
+                    {hint.items.map((it) => (
+                      <span key={it} className="h-chip">
+                        {it}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

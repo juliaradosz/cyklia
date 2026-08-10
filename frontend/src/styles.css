@@ -1697,6 +1697,14 @@ select {
   font-size: 11px;
   font-weight: 700;
 }
+.h-chip .h-pct {
+  font-weight: 500;
+  opacity: 0.7;
+}
+.h-chip.h-mood {
+  background: var(--mauve-100);
+  color: var(--mauve);
+}
 
 .j-sub-label {
   font-size: 12px;

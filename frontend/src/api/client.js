@@ -42,3 +42,31 @@ export async function api(path, options = {}) {
   }
   return data;
 }
+
+export async function download(path, filename) {
+  const token = getToken();
+  const res = await fetch(`/api${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    let msg = `Błąd ${res.status}`;
+    try {
+      const j = JSON.parse(await res.text());
+      if (j?.error) msg = j.error;
+    } catch {
+      /* keep default message */
+    }
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
