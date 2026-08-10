@@ -13,8 +13,7 @@ import {
   WEEK_LETTERS,
 } from "../utils.js";
 import Icon from "../components/Icon.jsx";
-
-const RETURN_KEY = "cyklia_cal_return";
+import { saveCalState, takeCalState, clearCalState } from "../calstate.js";
 
 const DOW = ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"];
 const MONTHS = [
@@ -65,7 +64,7 @@ export default function CalendarPage() {
       // Opuszczając kalendarz w dowolne inne miejsce (poza przejściem do
       // dziennika) czyścimy zapisany stan — kolejne otwarcie zaczyna od dziś.
       if (!leavingToJournalRef.current) {
-        sessionStorage.removeItem(RETURN_KEY);
+        clearCalState();
       }
     };
   }, []);
@@ -114,15 +113,8 @@ export default function CalendarPage() {
   }, [view, anchor.y, anchor.m, data]);
 
   useEffect(() => {
-    let saved = null;
-    try {
-      const raw = sessionStorage.getItem(RETURN_KEY);
-      if (raw) saved = JSON.parse(raw);
-    } catch {
-      saved = null;
-    }
+    const saved = takeCalState();
     if (!saved) return;
-    sessionStorage.removeItem(RETURN_KEY);
     if (saved.view) setView(saved.view);
     if (saved.anchor) setAnchor(saved.anchor);
     if (saved.year) setYear(saved.year);
@@ -230,23 +222,16 @@ export default function CalendarPage() {
 
   function goAddSymptoms() {
     if (!selected) return;
-    try {
-      leavingToJournalRef.current = true;
-      sessionStorage.setItem(
-        RETURN_KEY,
-        JSON.stringify({
-          view,
-          anchor,
-          year,
-          scrollTop:
-            view === "month"
-              ? scrollRef.current?.scrollTop ?? 0
-              : document.querySelector(".cal-year-wrap")?.scrollTop ?? 0,
-        })
-      );
-    } catch {
-      /* ignore */
-    }
+    leavingToJournalRef.current = true;
+    saveCalState({
+      view,
+      anchor,
+      year,
+      scrollTop:
+        view === "month"
+          ? scrollRef.current?.scrollTop ?? 0
+          : document.querySelector(".cal-year-wrap")?.scrollTop ?? 0,
+    });
     const q = new URLSearchParams();
     if (selected !== today) q.set("date", selected);
     q.set("return", "kalendarz");

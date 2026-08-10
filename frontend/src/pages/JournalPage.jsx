@@ -18,8 +18,7 @@ import {
   PHASE_HINTS,
 } from "../utils.js";
 import Icon from "../components/Icon.jsx";
-
-const RETURN_KEY = "cyklia_cal_return";
+import { clearCalState } from "../calstate.js";
 
 const EMPTY = {
   temperature: "",
@@ -89,7 +88,7 @@ export default function JournalPage() {
       // Jeśli wracamy do kalendarza, zostaw zapisany stan; w przeciwnym
       // razie wyczyść go, żeby kalendarz otwierał się zawsze na dziś.
       if (!goBackToCalendarRef.current) {
-        sessionStorage.removeItem(RETURN_KEY);
+        clearCalState();
       }
     };
   }, []);
