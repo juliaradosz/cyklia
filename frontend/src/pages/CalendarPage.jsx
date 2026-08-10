@@ -390,9 +390,8 @@ export default function CalendarPage() {
           <div className="cal-year-grid">
             {MONTHS_SHORT.map((mn, i) => {
               const all = monthCells(year, i);
-              const first = all.findIndex((c) => c.inMonth);
               const last = all.map((c) => c.inMonth).lastIndexOf(true);
-              const cells = all.slice(first, last + 1);
+              const cells = all.slice(0, last + 1);
               return (
                 <button
                   key={i}
