@@ -157,17 +157,9 @@ def day_type_for(day, cycle_starts, period_end_dates, prediction):
             return "period"
 
     if prediction.get("on_pills"):
-        # przy tabletkach brak owulacji/dni płodnych; ewentualny okres
-        # przewidywany jest w przerwie między blistrami
-        nxt = prediction.get("next_period_start")
-        brk = prediction.get("pill_break_days")
-        if brk is None:
-            brk = 7
-        if nxt:
-            p = parse_date(nxt)
-            p_end = p + timedelta(days=brk - 1)
-            if p <= day <= p_end:
-                return "period"
+        # Przy tabletkach kalendarz NIE podpowiada okresu — okres zaznacza
+        # wyłącznie użytkowniczka (zarejestrowane cykle). Brak owulacji
+        # i dni płodnych.
         return "normal"
 
     if prediction.get("has_data") and prediction.get("ovulation_date"):
@@ -180,3 +172,19 @@ def day_type_for(day, cycle_starts, period_end_dates, prediction):
             return "fertile"
 
     return "normal"
+
+
+def pill_active(day, pill_start, pill_cycle, pill_break):
+    """Czy w danym dniu przyjmuje się tabletkę (czyli czy dzień nie wypada
+    w przerwie między blistrami). Opiera się wyłącznie na dacie rozpoczęcia
+    przyjmowania (pill_start) i schemacie — NIE wpływa na okres w kalendarzu.
+    """
+    active = max(int(pill_cycle or 21), 1)
+    brk = max(int(pill_break or 0), 0)
+    if brk == 0:
+        return True
+    if not pill_start:
+        return True
+    d = parse_date(day)
+    ps = parse_date(pill_start)
+    return ((d - ps).days % (active + brk)) < active

@@ -905,7 +905,12 @@ def _pill_status(user_id, day):
         pill_start=user.get("pill_start_date") or None,
     )
     day_type = cyc.day_type_for(day, starts, ends, pred) if on_pills else "normal"
-    needs_log = on_pills and day_type != "period"
+    needs_log = on_pills and cyc.pill_active(
+        day,
+        user.get("pill_start_date") or None,
+        user["pill_cycle_days"] or 21,
+        _pill_break_value(user),
+    )
     log = db.query_one(
         "SELECT * FROM pill_logs WHERE user_id = ? AND date = ?", (user_id, day)
     )
