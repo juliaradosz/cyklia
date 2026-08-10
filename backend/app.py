@@ -371,8 +371,11 @@ def create_app():
         from flask import send_file
         import io as _io
 
-        data = report.build_report(user_id)
-        pdf_bytes = report.render_pdf(data)
+        try:
+            data = report.build_report(user_id)
+            pdf_bytes = report.render_pdf(data)
+        except RuntimeError as e:
+            return jsonify({"error": str(e)}), 500
         return send_file(
             _io.BytesIO(pdf_bytes),
             mimetype="application/pdf",

@@ -13,8 +13,6 @@ import os
 import urllib.request
 from datetime import datetime
 
-from fpdf import FPDF
-
 import database as db
 import predict as pred
 
@@ -252,6 +250,12 @@ def _fmt_num(v, suffix=""):
 
 
 def render_pdf(d):
+    try:
+        from fpdf import FPDF
+    except ImportError as e:
+        raise RuntimeError(
+            "Brak biblioteki fpdf2 na serwerze — zainstaluj: pip install fpdf2"
+        ) from e
     pdf = FPDF(format="A4")
     pdf.set_margin(15)
     pdf.set_auto_page_break(auto=True, margin=18)
