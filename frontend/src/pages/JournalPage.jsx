@@ -83,6 +83,8 @@ export default function JournalPage() {
   const { data: cal } = useCalendar();
   const goBackToCalendarRef = useRef(false);
   const [feel, setFeel] = useState(null);
+  const [ai, setAi] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -348,6 +350,22 @@ export default function JournalPage() {
     setShowHistory(false);
   }
 
+  async function runAi() {
+    setAiBusy(true);
+    try {
+      const r = await api("/journal/ai");
+      setAi(
+        r && r.ok
+          ? r
+          : { ok: false, text: r?.text || "Nie udało się przygotować analizy." }
+      );
+    } catch {
+      setAi({ ok: false, text: "Nie udało się przygotować analizy." });
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   return (
     <div>
       <div className="j-topbar">
@@ -435,6 +453,35 @@ export default function JournalPage() {
               </>
             )}
           </div>
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="sparkles" size={17} />
+            </span>
+            <b>Analiza AI Twojego dziennika</b>
+          </div>
+          {aiBusy ? (
+            <p className="h-text">Analizuję Twoje wpisy… to może chwilę potrwać.</p>
+          ) : ai ? (
+            <>
+              <p className="h-text">{ai.text}</p>
+              {ai.ai && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Analiza przygotowana przez AI · to nie diagnoza</div>}
+              <button
+                type="button"
+                className="show-more"
+                onClick={runAi}
+                disabled={aiBusy}
+              >
+                Odśwież analizę
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn small" onClick={runAi} disabled={aiBusy}>
+              Analizuj moje wpisy
+            </button>
+          )}
         </div>
 
         <div className="j-section">

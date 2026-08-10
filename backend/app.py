@@ -372,6 +372,11 @@ def create_app():
             return jsonify({"error": "Nieprawidłowa data"}), 400
         return jsonify(predict.predict_feel(user_id, day))
 
+    @app.get("/api/journal/ai")
+    @auth.auth_required
+    def journal_ai(user_id):
+        return jsonify(predict.analyze_journal(user_id))
+
     # ---------- Raport PDF dla ginekologa ----------
 
     @app.get("/api/report/pdf")

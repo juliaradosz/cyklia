@@ -10,6 +10,7 @@ w groq_key.py / zmiennych środowiskowych), a bez niego — lokalnie.
 """
 import json
 import urllib.request
+from collections import Counter
 from datetime import datetime, timedelta
 
 import database as db
@@ -310,6 +311,183 @@ def _llm_describe(r):
     )
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return data["choices"][0]["message"]["content"].strip()
+    except Exception:
+        return None
+
+
+def analyze_journal(user_id, days=45):
+    """Analiza wpisów z dziennika (objawy, nastrój, sen, stres) — najpierw
+    przez model AI, a bez niego lokalne podsumowanie. Zwraca {"ok", "ai", "text"}."""
+    user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+    if not user:
+        return {"ok": False, "text": "Nie znaleziono użytkownika."}
+    cycles = db.query(
+        "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
+    )
+    entries = db.query(
+        "SELECT * FROM entries WHERE user_id = ? ORDER BY date", (user_id,)
+    )
+    if not entries:
+        return {
+            "ok": False,
+            "text": "Najpierw zapisz chociaż jeden wpis w dzienniku — analiza będzie "
+            "się opierać na Twoich danych.",
+        }
+    cutoff = datetime.now().date() - timedelta(days=days)
+    filtered = [e for e in entries if _to_date(e["date"]) >= cutoff]
+    if not filtered:
+        return {
+            "ok": False,
+            "text": "Brak wpisów z ostatnich 45 dni — zapisuj dziennik codziennie, "
+            "żeby analiza miała się na czym oprzeć.",
+        }
+
+    starts = sorted({cyc.parse_date(c["start_date"]) for c in cycles})
+    ends = [
+        cyc.parse_date(c["end_date"]) if c["end_date"] else None
+        for c in sorted(cycles, key=lambda x: x["start_date"])
+    ]
+    pred = _prediction(user, [s.isoformat() for s in starts], user_id=user_id)
+    method = _user_method(user)
+    on_pills = method["on"]
+    period_len = user["period_length_default"]
+
+    sym_count = Counter()
+    mood_count = Counter()
+    phase_syms = {}
+    phase_days = Counter()
+    sleeps, stresses, waters, activities, temps = [], [], [], [], []
+    n_notes = 0
+
+    for e in filtered:
+        d = _to_date(e["date"])
+        ph = _phase(d, starts, ends, pred, period_len, on_pills) or "Inne"
+        phase_days[ph] += 1
+        for s in _parse_list(e["symptoms"]):
+            sym_count[s] += 1
+            phase_syms.setdefault(ph, Counter())[s] += 1
+        for m in _parse_list(e["mood"]):
+            mood_count[m] += 1
+        if e["sleep"] is not None:
+            sleeps.append(float(e["sleep"]))
+        if e["stress"] is not None:
+            stresses.append(int(e["stress"]))
+        if e["water"] is not None:
+            waters.append(int(e["water"]))
+        if e["activity"] is not None:
+            activities.append(int(e["activity"]))
+        if e["temperature"] is not None:
+            temps.append(float(e["temperature"]))
+        if e["notes"]:
+            n_notes += 1
+
+    def top(c, n=4):
+        return [{"name": k, "count": v} for k, v in c.most_common(n)]
+
+    cycle_lengths = [
+        (b - a).days for a, b in zip(starts[:-1], starts[1:]) if (b - a).days > 0
+    ]
+    period_lengths = [
+        (cyc.parse_date(c["end_date"]) - cyc.parse_date(c["start_date"])).days + 1
+        for c in cycles
+        if c["end_date"]
+    ]
+    period_lengths = [p for p in period_lengths if 1 <= p <= 21]
+
+    stats = {
+        "days_covered": len(filtered),
+        "phases": dict(phase_days),
+        "phase_symptoms": {
+            ph: [{"name": k, "count": v} for k, v in c.most_common(3)]
+            for ph, c in phase_syms.items()
+        },
+        "symptoms": top(sym_count),
+        "moods": top(mood_count),
+        "sleep_avg": round(sum(sleeps) / len(sleeps), 1) if sleeps else None,
+        "stress_avg": round(sum(stresses) / len(stresses), 1) if stresses else None,
+        "water_avg": round(sum(waters) / len(waters), 1) if waters else None,
+        "activity_avg": round(sum(activities) / len(activities)) if activities else None,
+        "temp_avg": round(sum(temps) / len(temps), 2) if temps else None,
+        "notes_count": n_notes,
+        "cycle_lengths": cycle_lengths,
+        "period_lengths": period_lengths,
+    }
+
+    text = _llm_analyze(stats)
+    if text:
+        return {"ok": True, "ai": True, "text": text, "stats": stats}
+    return {"ok": True, "ai": False, "text": _local_analyze(stats), "stats": stats}
+
+
+def _local_analyze(stats):
+    parts = [f"Przeanalizowałam {stats['days_covered']} dni Twoich wpisów."]
+    if stats["symptoms"]:
+        names = ", ".join(
+            f"{s['name']} ({s['count']} dni)" for s in stats["symptoms"][:3]
+        )
+        parts.append(f"Najczęstsze objawy to: {names}.")
+    if stats["moods"]:
+        parts.append(
+            "Wśród nastrojów dominuje: "
+            + ", ".join(m["name"] for m in stats["moods"][:3])
+            + "."
+        )
+    if stats["sleep_avg"]:
+        parts.append(f"Średnia długość snu to {stats['sleep_avg']} h.")
+    if stats["stress_avg"]:
+        parts.append(f"Średni poziom stresu to {stats['stress_avg']}/5.")
+    parts.append(
+        "Zapisuj objawy i nastrój codziennie, a analiza będzie coraz dokładniejsza."
+    )
+    return " ".join(parts)
+
+
+def _llm_analyze(stats):
+    """Przygotowuje przyjazną analizę dziennika przez model AI (jeśli skonfigurowany)."""
+    import chat_bot
+
+    api_url, api_key, model = chat_bot._load_groq_config()
+    if not (api_url and api_key):
+        return None
+    body = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Jesteś empatycznym asystentem zdrowia kobiet w aplikacji Cyklia. "
+                    "Analizujesz dziennik użytkowniczki: objawy, nastrój, sen, stres. "
+                    "Odpowiadasz po polsku, ciepło i konkretnie, w 3–6 zdaniach, "
+                    "bez list i procentów. To treść edukacyjna, nie diagnoza."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Użytkowniczka zapisała wpisy w dzienniku (ostatnie dni). "
+                    "Podsumowanie danych:\n" + json.dumps(stats, ensure_ascii=False)
+                    + "\n\nNapisz przyjazną analizę: co zwykle towarzyszy jej cyklowi, "
+                    "czy objawy mają związek z fazą cyklu, na co może zwrócić uwagę "
+                    "i co może pomóc. Wspomnij o śnie i stresie, jeśli są dane. "
+                    "Jeśli danych jest mało, zachęć do codziennego zapisywania."
+                ),
+            },
+        ],
+        "temperature": 0.7,
+    }
+    req = urllib.request.Request(
+        api_url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + api_key,
+            "User-Agent": "Cyklia/1.0 (analiza dziennika)",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=45) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         return data["choices"][0]["message"]["content"].strip()
     except Exception:
