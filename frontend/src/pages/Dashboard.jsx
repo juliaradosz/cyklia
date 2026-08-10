@@ -126,7 +126,7 @@ export default function Dashboard() {
   const nextRegStart = sortedStarts.find((s) => s.start_date > activeDay);
   const countdown = nextRegStart
     ? daysBetween(activeDay, nextRegStart.start_date)
-    : !onPills && pred.next_period_start
+    : pred.next_period_start
     ? daysBetween(activeDay, pred.next_period_start)
     : null;
 

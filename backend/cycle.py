@@ -48,6 +48,26 @@ def build_calendar(
         active = max(int(pill_cycle), 1)
         brk = max(int(pill_break), 0)
         total = active + brk
+        if start_dates:
+            # Okres przewidywany wyłącznie z zarejestrowanych cykli
+            # użytkowniczki — data rozpoczęcia tabletek NIE wpływa na okres.
+            last = start_dates[-1]
+            next_start = last + timedelta(days=total)
+            today = date.today()
+            while next_start <= today:
+                next_start += timedelta(days=total)
+            return {
+                "has_data": True,
+                "on_pills": True,
+                "method": method,
+                "next_period_start": iso(next_start),
+                "ovulation_date": None,
+                "fertile_start": None,
+                "fertile_end": None,
+                "cycle_length": total,
+                "period_length": per,
+                "pill_break_days": brk,
+            }
         if pill_start:
             ps = parse_date(pill_start)
             today = date.today()
@@ -71,29 +91,11 @@ def build_calendar(
                 "period_length": per,
                 "pill_break_days": brk,
             }
-        if not start_dates:
-            return {
-                "has_data": False,
-                "on_pills": True,
-                "method": method,
-                "next_period_start": None,
-                "ovulation_date": None,
-                "fertile_start": None,
-                "fertile_end": None,
-                "cycle_length": total,
-                "period_length": per,
-                "pill_break_days": int(pill_break),
-            }
-        last = start_dates[-1]
-        next_start = last + timedelta(days=total)
-        today = date.today()
-        while next_start <= today:
-            next_start += timedelta(days=total)
         return {
-            "has_data": True,
+            "has_data": False,
             "on_pills": True,
             "method": method,
-            "next_period_start": iso(next_start),
+            "next_period_start": None,
             "ovulation_date": None,
             "fertile_start": None,
             "fertile_end": None,
