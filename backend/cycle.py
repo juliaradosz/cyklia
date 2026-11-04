@@ -1,5 +1,7 @@
 from datetime import date, datetime, timedelta
 
+import localtime
+
 
 def parse_date(s):
     return datetime.strptime(s, "%Y-%m-%d").date()
@@ -57,7 +59,7 @@ def build_calendar(
         active = max(int(pill_cycle), 1)
         brk = max(int(pill_break), 0)
         total = active + brk
-        today = date.today()
+        today = localtime.today()
         if pill_start:
             # Kotwica: pierwsza zarejestrowana tabletka bieżącego blistra
             # (lub data startu z profilu). Następny okres = początek
@@ -123,7 +125,7 @@ def build_calendar(
         }
 
     last = start_dates[-1]
-    today = date.today()
+    today = localtime.today()
     # Przewidywany kolejny okres może wypaść przed dziś, jeśli cykl się opóźnia.
     next_start = last + timedelta(days=cycle)
     while next_start <= today:

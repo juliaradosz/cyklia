@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, getToken, setToken, logout as clearSession } from "./client.js";
+import { currentSubscription, syncPush } from "../push.js";
 
 const AuthContext = createContext(null);
 
@@ -17,6 +18,7 @@ export function AuthProvider({ children }) {
         const me = await api("/me");
         setUser(me);
         localStorage.setItem("cyklia_user", JSON.stringify(me));
+        syncPush();
       } catch {
         clearSession();
       } finally {
@@ -45,14 +47,36 @@ export function AuthProvider({ children }) {
     setUser(user);
   }
 
-  function logout() {
+  async function logout() {
+    // to urządzenie przestaje dostawać powiadomienia tego konta
+    try {
+      const sub = await currentSubscription();
+      if (sub) {
+        await api("/push/unsubscribe", { method: "POST", body: { endpoint: sub.endpoint } });
+      }
+    } catch {
+      /* ignore */
+    }
     clearSession();
     setUser(null);
   }
 
+  // wygasła sesja (401) w trakcie korzystania → powrót do logowania
+  useEffect(() => {
+    const onExpired = () => {
+      clearSession();
+      setUser(null);
+    };
+    window.addEventListener("cyklia:unauthorized", onExpired);
+    return () => window.removeEventListener("cyklia:unauthorized", onExpired);
+  }, []);
+
   function updateUser(patch) {
-    setUser((u) => ({ ...u, ...patch }));
-    localStorage.setItem("cyklia_user", JSON.stringify({ ...user, ...patch }));
+    setUser((u) => {
+      const next = { ...u, ...patch };
+      localStorage.setItem("cyklia_user", JSON.stringify(next));
+      return next;
+    });
   }
 
   return (

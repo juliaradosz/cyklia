@@ -21,7 +21,32 @@ CREATE TABLE IF NOT EXISTS users (
     pill_start_date TEXT,
     patch_mode INTEGER DEFAULT 0,
     patch_name TEXT,
+    notify_pill INTEGER DEFAULT 1,
+    notify_period INTEGER DEFAULT 1,
+    notify_fertile INTEGER DEFAULT 0,
+    notify_patch INTEGER DEFAULT 1,
+    notify_period_days INTEGER DEFAULT 2,
     created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    endpoint TEXT UNIQUE NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS notification_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    day TEXT NOT NULL,
+    sent_at TEXT NOT NULL,
+    UNIQUE (user_id, kind, day),
+    FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
 CREATE TABLE IF NOT EXISTS cycles (
@@ -162,6 +187,12 @@ MIGRATIONS = [
     # tryb plastrow antykoncepcyjnych (users)
     ("ALTER TABLE users ADD COLUMN patch_mode INTEGER DEFAULT 0", "patch_mode"),
     ("ALTER TABLE users ADD COLUMN patch_name TEXT", "patch_name"),
+    # powiadomienia (users)
+    ("ALTER TABLE users ADD COLUMN notify_pill INTEGER DEFAULT 1", "notify_pill"),
+    ("ALTER TABLE users ADD COLUMN notify_period INTEGER DEFAULT 1", "notify_period"),
+    ("ALTER TABLE users ADD COLUMN notify_fertile INTEGER DEFAULT 0", "notify_fertile"),
+    ("ALTER TABLE users ADD COLUMN notify_patch INTEGER DEFAULT 1", "notify_patch"),
+    ("ALTER TABLE users ADD COLUMN notify_period_days INTEGER DEFAULT 2", "notify_period_days"),
     # rozszerzone pola dziennika (entries)
     ("ALTER TABLE entries ADD COLUMN libido TEXT", "libido"),
     ("ALTER TABLE entries ADD COLUMN stress INTEGER", "stress"),
@@ -187,8 +218,15 @@ MIGRATIONS = [
 ]
 
 
+USER_COLS = {
+    "pill_mode", "pill_cycle_days", "pill_break_days", "pill_name", "pill_time",
+    "pill_start_date", "patch_mode", "patch_name", "notify_pill", "notify_period",
+    "notify_fertile", "notify_patch", "notify_period_days",
+}
+
+
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
@@ -211,7 +249,7 @@ def migrate(conn=None):
     acols = {r["name"] for r in conn.execute("PRAGMA table_info(articles)")}
     mcols = {r["name"] for r in conn.execute("PRAGMA table_info(chat_messages)")}
     for sql, col in MIGRATIONS:
-        if col in {"pill_mode", "pill_cycle_days", "pill_break_days", "pill_name", "pill_time", "pill_start_date", "patch_mode", "patch_name"}:
+        if col in USER_COLS:
             cols_set = cols
         elif col in {"libido", "stress", "mucus", "weight", "steps", "sleep_quality", "sex", "bleeding", "digestive"}:
             cols_set = ecols

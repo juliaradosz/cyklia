@@ -6,6 +6,9 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 import auth
+import notify
+import localtime
+import pillsched
 import database as db
 import cycle as cyc
 import predict
@@ -52,8 +55,14 @@ def create_app():
         email = (data.get("email") or "").strip().lower()
         password = data.get("password") or ""
         user = db.query_one("SELECT * FROM users WHERE email = ?", (email,))
-        if not user or user["password_hash"] != auth.hash_password(password):
+        if not user or not auth.verify_password(password, user["password_hash"]):
             return jsonify({"error": "Niepoprawny e-mail lub hasło"}), 401
+        if auth.needs_rehash(user["password_hash"]):
+            # stary, słaby skrót SHA-256 → bezpieczny PBKDF2 przy logowaniu
+            db.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (auth.hash_password(password), user["id"]),
+            )
         return jsonify({"token": auth.make_token(user["id"]), "user": _user_payload(user["id"])})
 
     @app.get("/api/me")
@@ -61,28 +70,75 @@ def create_app():
     def me(user_id):
         return jsonify(_user_payload(user_id))
 
+    @app.post("/api/me/password")
+    @auth.auth_required
+    def change_password(user_id):
+        data = request.get_json(silent=True) or {}
+        current = data.get("current_password") or ""
+        new_pw = data.get("new_password") or ""
+        user = db.query_one("SELECT password_hash FROM users WHERE id = ?", (user_id,))
+        if not auth.verify_password(current, user["password_hash"]):
+            return jsonify({"error": "Obecne hasło jest niepoprawne"}), 400
+        if len(new_pw) < 6:
+            return jsonify({"error": "Nowe hasło musi mieć co najmniej 6 znaków"}), 400
+        db.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (auth.hash_password(new_pw), user_id),
+        )
+        return jsonify({"ok": True})
+
+    @app.delete("/api/me")
+    @auth.auth_required
+    def delete_account(user_id):
+        data = request.get_json(silent=True) or {}
+        user = db.query_one("SELECT password_hash FROM users WHERE id = ?", (user_id,))
+        if not auth.verify_password(data.get("password") or "", user["password_hash"]):
+            return jsonify({"error": "Niepoprawne hasło"}), 400
+        for table in (
+            "chat_messages", "chat_sessions", "user_articles", "comments", "posts",
+            "entries", "cycles", "pill_logs", "patch_logs", "push_subscriptions",
+            "notification_log",
+        ):
+            db.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        return jsonify({"ok": True})
+
     @app.patch("/api/me")
     @auth.auth_required
     def update_me(user_id):
         data = request.get_json(silent=True) or {}
         fields, args = [], []
-        for key in ("display_name",):
+        if "display_name" in data:
+            fields.append("display_name = ?")
+            args.append(str(data["display_name"] or "").strip()[:60])
+        # Długość cyklu 14–60 dni, długość okresu 1–14 dni (wcześniej oba
+        # pola miały zakres 14–60, więc długość okresu nigdy się nie zapisywała).
+        for key, lo, hi in (
+            ("cycle_length_default", 14, 60),
+            ("period_length_default", 1, 14),
+        ):
+            val = _as_int(data.get(key)) if key in data else None
+            if val is not None and lo <= val <= hi:
+                fields.append(f"{key} = ?")
+                args.append(val)
+        for key in NOTIFY_FIELDS:
             if key in data:
                 fields.append(f"{key} = ?")
-                args.append(str(data[key]))
-        for key in ("cycle_length_default", "period_length_default"):
-            if key in data and isinstance(data[key], int) and 14 <= data[key] <= 60:
-                fields.append(f"{key} = ?")
-                args.append(data[key])
+                args.append(1 if data[key] else 0)
+        if "notify_period_days" in data:
+            val = _as_int(data.get("notify_period_days"))
+            if val is not None:
+                fields.append("notify_period_days = ?")
+                args.append(max(0, min(7, val)))
         if "pill_mode" in data:
             fields.append("pill_mode = ?")
             args.append(1 if data["pill_mode"] else 0)
-        if "pill_cycle_days" in data and isinstance(data["pill_cycle_days"], int):
+        if "pill_cycle_days" in data and _as_int(data["pill_cycle_days"]) is not None:
             fields.append("pill_cycle_days = ?")
-            args.append(max(1, min(30, data["pill_cycle_days"])))
-        if "pill_break_days" in data and isinstance(data["pill_break_days"], int):
+            args.append(max(1, min(30, _as_int(data["pill_cycle_days"]))))
+        if "pill_break_days" in data and _as_int(data["pill_break_days"]) is not None:
             fields.append("pill_break_days = ?")
-            args.append(max(0, min(14, data["pill_break_days"])))
+            args.append(max(0, min(14, _as_int(data["pill_break_days"]))))
         if "pill_name" in data:
             fields.append("pill_name = ?")
             args.append(str(data.get("pill_name") or ""))
@@ -155,7 +211,7 @@ def create_app():
     @app.get("/api/pills/log")
     @auth.auth_required
     def get_pill_log(user_id):
-        day = request.args.get("date") or date.today().isoformat()
+        day = request.args.get("date") or localtime.today_iso()
         try:
             datetime.strptime(day, "%Y-%m-%d")
         except ValueError:
@@ -166,12 +222,12 @@ def create_app():
     @auth.auth_required
     def mark_pill_taken(user_id):
         data = request.get_json(silent=True) or {}
-        day = data.get("date") or date.today().isoformat()
+        day = data.get("date") or localtime.today_iso()
         try:
             datetime.strptime(day, "%Y-%m-%d")
         except ValueError:
             return jsonify({"error": "Nieprawidłowa data"}), 400
-        taken_at = (data.get("time") or datetime.now().strftime("%H:%M")).strip()
+        taken_at = (data.get("time") or localtime.now_hm()).strip()
         try:
             datetime.strptime(taken_at, "%H:%M")
         except ValueError:
@@ -190,7 +246,7 @@ def create_app():
     @auth.auth_required
     def unmark_pill(user_id):
         data = request.get_json(silent=True) or {}
-        day = data.get("date") or date.today().isoformat()
+        day = data.get("date") or localtime.today_iso()
         try:
             datetime.strptime(day, "%Y-%m-%d")
         except ValueError:
@@ -213,7 +269,7 @@ def create_app():
     @app.get("/api/patch/log")
     @auth.auth_required
     def get_patch_log(user_id):
-        day = request.args.get("date") or date.today().isoformat()
+        day = request.args.get("date") or localtime.today_iso()
         try:
             datetime.strptime(day, "%Y-%m-%d")
         except ValueError:
@@ -224,7 +280,7 @@ def create_app():
     @auth.auth_required
     def mark_patch_applied(user_id):
         data = request.get_json(silent=True) or {}
-        day = data.get("date") or date.today().isoformat()
+        day = data.get("date") or localtime.today_iso()
         try:
             datetime.strptime(day, "%Y-%m-%d")
         except ValueError:
@@ -236,7 +292,7 @@ def create_app():
             "INSERT INTO patch_logs (user_id, date, applied_at, created_at) "
             "VALUES (?, ?, ?, ?) "
             "ON CONFLICT(user_id, date) DO UPDATE SET applied_at = excluded.applied_at",
-            (user_id, day, datetime.now().strftime("%H:%M"), db.now_iso()),
+            (user_id, day, localtime.now_hm(), db.now_iso()),
         )
         return jsonify(_patch_status(user_id, day))
 
@@ -244,7 +300,7 @@ def create_app():
     @auth.auth_required
     def unmark_patch(user_id):
         data = request.get_json(silent=True) or {}
-        day = data.get("date") or date.today().isoformat()
+        day = data.get("date") or localtime.today_iso()
         try:
             datetime.strptime(day, "%Y-%m-%d")
         except ValueError:
@@ -275,6 +331,13 @@ def create_app():
             datetime.strptime(start, "%Y-%m-%d")
         except (ValueError, TypeError):
             return jsonify({"error": "Podaj poprawną datę rozpoczęcia"}), 400
+        if end:
+            try:
+                datetime.strptime(end, "%Y-%m-%d")
+            except ValueError:
+                return jsonify({"error": "Nieprawidłowa data zakończenia"}), 400
+            if end < start:
+                return jsonify({"error": "Koniec okresu nie może być przed początkiem"}), 400
         existing = db.query_one(
             "SELECT * FROM cycles WHERE user_id = ? AND start_date = ?", (user_id, start)
         )
@@ -291,7 +354,7 @@ def create_app():
         cid = db.execute(
             "INSERT INTO cycles (user_id, start_date, end_date, flow_level) "
             "VALUES (?, ?, ?, ?)",
-            (user_id, start, end, int(flow) if flow is not None else 1),
+            (user_id, start, end, _as_int(flow) or 1),
         )
         row = db.query_one("SELECT * FROM cycles WHERE id = ?", (cid,))
         return jsonify(row), 201
@@ -324,7 +387,7 @@ def create_app():
                 args.append(val)
         if "flow_level" in data:
             fields.append("flow_level = ?")
-            args.append(int(data["flow_level"]) if data["flow_level"] is not None else 1)
+            args.append(_as_int(data["flow_level"]) or 1)
         if not fields:
             return jsonify(row)
         args.append(cid)
@@ -485,8 +548,8 @@ def create_app():
             pill_start=_pill_anchor(user_id, user),
         )
         # zakres widoczny: od pierwszego wpisu do +90 dni w przyszłość
-        min_day = min(starts) if starts else date.today().isoformat()
-        max_day = (date.today() + __import__("datetime").timedelta(days=90)).isoformat()
+        min_day = min(starts) if starts else localtime.today_iso()
+        max_day = (localtime.today() + __import__("datetime").timedelta(days=90)).isoformat()
         days = {}
         d = datetime.strptime(min_day, "%Y-%m-%d").date()
         last = datetime.strptime(max_day, "%Y-%m-%d").date()
@@ -619,7 +682,7 @@ def create_app():
     @app.get("/api/inspirations")
     @auth.auth_required
     def daily_inspirations(user_id):
-        today = date.today().isoformat()
+        today = localtime.today_iso()
         cycles = db.query(
             "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
         )
@@ -852,6 +915,63 @@ def create_app():
         answer = _chat_send(user_id, sid, message)
         return jsonify({"reply": answer})
 
+    # ---------- Powiadomienia push ----------
+
+    @app.get("/api/push/public-key")
+    def push_public_key():
+        key = notify.public_key()
+        return jsonify({"key": key, "available": bool(key)})
+
+    @app.get("/api/push/status")
+    @auth.auth_required
+    def push_status(user_id):
+        return jsonify({
+            "available": notify.PUSH_AVAILABLE,
+            "devices": notify.subscription_count(user_id),
+        })
+
+    @app.post("/api/push/subscribe")
+    @auth.auth_required
+    def push_subscribe(user_id):
+        data = request.get_json(silent=True) or {}
+        try:
+            notify.save_subscription(user_id, data.get("subscription") or data)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        return jsonify({"ok": True, "devices": notify.subscription_count(user_id)})
+
+    @app.post("/api/push/unsubscribe")
+    @auth.auth_required
+    def push_unsubscribe(user_id):
+        data = request.get_json(silent=True) or {}
+        endpoint = data.get("endpoint")
+        if endpoint:
+            notify.delete_subscription(user_id, endpoint)
+        return jsonify({"ok": True, "devices": notify.subscription_count(user_id)})
+
+    @app.post("/api/push/test")
+    @auth.auth_required
+    def push_test(user_id):
+        sent, errors = notify.send_to_user(
+            user_id,
+            "Cyklia 🌸",
+            "Powiadomienia działają! Tak będą wyglądać przypomnienia.",
+            "/profil",
+            tag="test",
+        )
+        if not sent:
+            return jsonify({"error": errors[0] if errors else "Nie wysłano", "errors": errors}), 502
+        return jsonify({"sent": sent, "errors": errors})
+
+    @app.route("/api/cron/reminders", methods=["GET", "POST"])
+    def cron_reminders():
+        import hmac as _hmac
+
+        key = request.args.get("key") or request.headers.get("X-Cron-Key") or ""
+        if not _hmac.compare_digest(key, notify.cron_key()):
+            return jsonify({"error": "Brak dostępu"}), 403
+        return jsonify(notify.run_reminders())
+
     # ---------- Serwowanie frontendu (po zbudowaniu) ----------
 
     if os.path.isdir(DIST_DIR):
@@ -870,11 +990,28 @@ def create_app():
     return app
 
 
+NOTIFY_FIELDS = ("notify_pill", "notify_period", "notify_fertile", "notify_patch")
+
+
+def _as_int(value):
+    """Bezpieczna konwersja na int (liczba lub tekst z liczbą), inaczej None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return int(value.strip())
+    return None
+
+
 def _user_payload(user_id):
     u = db.query_one(
         "SELECT id, email, display_name, cycle_length_default, period_length_default, "
         "pill_mode, pill_cycle_days, pill_break_days, pill_name, pill_time, "
-        "pill_start_date, patch_mode, patch_name, created_at "
+        "pill_start_date, patch_mode, patch_name, notify_pill, notify_period, "
+        "notify_fertile, notify_patch, notify_period_days, created_at "
         "FROM users WHERE id = ?",
         (user_id,),
     )
@@ -894,21 +1031,8 @@ def _pill_break_value(user):
 
 
 def _pill_anchor(user_id, user):
-    """Kotwica harmonogramu tabletek: pierwsza zarejestrowana tabletka
-    bieżącego blistra (z dziennika). Gdy brak logów w ostatnim cyklu —
-    data rozpoczęcia tabletek z profilu. Dzięki temu wcześniej przyjęta
-    tabletka automatycznie przesuwa prognozę okresu wcześniej."""
-    active = int(user["pill_cycle_days"] or 21)
-    total = active + _pill_break_value(user)
-    row = db.query_one(
-        "SELECT MIN(date) AS d FROM pill_logs "
-        "WHERE user_id = ? AND date <= ? AND date > ?",
-        (user_id, date.today().isoformat(),
-         (date.today() - timedelta(days=total)).isoformat()),
-    )
-    if row and row["d"]:
-        return row["d"]
-    return user.get("pill_start_date") or None
+    """Kotwica harmonogramu tabletek — patrz pillsched.pill_anchor."""
+    return pillsched.pill_anchor(user_id, user)
 
 
 def _pill_status(user_id, day):
@@ -1122,7 +1246,7 @@ def _chat_context(user_id):
         method=method["method"],
         pill_start=_pill_anchor(user_id, user),
     )
-    today = date.today()
+    today = localtime.today()
     cycle_day = None
     if starts:
         last_start = datetime.strptime(starts[-1], "%Y-%m-%d").date()

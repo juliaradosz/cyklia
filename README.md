@@ -22,6 +22,10 @@ głównego z Safari) z backendem w Pythonie/Flasku, przeznaczona do wdrożenia n
   płatnych API; można podpiąć własny klucz do darmowych modeli — patrz niżej
 - Artykuły edukacyjne o cyklu i zdrowiu
 - PWA — instalacja na telefonie, ikona na ekranie głównym
+- **Powiadomienia push**: tabletka, plaster, zbliżający się okres, dni płodne
+  (Profil → Powiadomienia)
+
+Szczegółowy opis działania (reguły, obliczenia, endpointy): **[LOGIKA.md](LOGIKA.md)**.
 
 ## Struktura
 
@@ -193,9 +197,20 @@ potem kliknij **Reload**. Bez tych zmiennych aplikacja i tak działa — lokalny
 asystent jest całkowicie darmowy i zna Twój kalendarz (podaje daty okresu,
 owulacji, dzień cyklu).
 
+## Powiadomienia (push)
+
+1. Po wdrożeniu wypisz klucz crona w konsoli PythonAnywhere:
+   `cd ~/cyklia/backend && ../venv/bin/python send_reminders.py --key`
+2. Załóż darmowe konto na https://cron-job.org i dodaj zadanie co 10 minut
+   wywołujące: `https://twojanazwa.pythonanywhere.com/api/cron/reminders?key=KLUCZ`
+   (na płatnym planie PA można zamiast tego dodać godzinne zadanie
+   `python send_reminders.py` w zakładce *Tasks*).
+3. W aplikacji: Profil → Powiadomienia → włącz i wyślij test.
+   Na iPhonie najpierw dodaj Cyklię do ekranu głównego (iOS 16.4+).
+
 ## Bezpieczeństwo danych
 
-- Hasła są przechowywane jako skróty (SHA-256 z saltem w nazwie domeny).
+- Hasła są przechowywane jako skróty PBKDF2-SHA256 z losową solą.
 - Tokeny JWT wygasają po 30 dniach.
 - Każdy użytkownik widzi wyłącznie swoje dane kalendarza i dziennika.
 - W aplikacji brak śledzenia i udostępniania danych osobom trzecim.
@@ -205,7 +220,6 @@ owulacji, dzień cyklu).
 ## Czego można dodać w przyszłości
 
 - Wykresy i eksport danych (CSV/PDF)
-- Push powiadomienia o okresie i dniach płodnych
 - Przypomnienia o mierzeniu temperatury
 - Integracja z Apple Health / Google Fit
 - Uwierzytelnianie przez Google/Apple

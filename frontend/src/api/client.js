@@ -36,6 +36,9 @@ export async function api(path, options = {}) {
     }
   }
   if (!res.ok) {
+    if (res.status === 401 && token && path !== "/login") {
+      window.dispatchEvent(new Event("cyklia:unauthorized"));
+    }
     const err = new Error(data?.error || `Błąd ${res.status}`);
     err.status = res.status;
     throw err;

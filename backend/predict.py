@@ -14,6 +14,7 @@ from collections import Counter
 from datetime import datetime, timedelta
 
 import database as db
+import localtime
 import cycle as cyc
 
 
@@ -48,17 +49,10 @@ def _user_method(user):
 
 
 def _first_pill_date(user_id, user):
-    """Pierwsza zarejestrowana tabletka bieżącego blistra (kotwica
-    harmonogramu); brak logów w ostatnim cyklu → None."""
-    active = int(user.get("pill_cycle_days") or 21)
-    brk = user.get("pill_break_days")
-    total = active + (brk if brk is not None else 7)
-    today = datetime.now().strftime("%Y-%m-%d")
-    row = db.query_one(
-        "SELECT MIN(date) AS d FROM pill_logs WHERE user_id = ? AND date <= ? AND date > ?",
-        (user_id, today, (datetime.now() - timedelta(days=total)).strftime("%Y-%m-%d")),
-    )
-    return row["d"] if row and row["d"] else None
+    """Dzień 1 bieżącego blistra (wspólna logika z app.py)."""
+    import pillsched
+
+    return pillsched.pill_anchor(user_id, user)
 
 
 def _prediction(user, starts, user_id=None):
@@ -335,7 +329,7 @@ def analyze_journal(user_id, days=45):
             "text": "Najpierw zapisz chociaż jeden wpis w dzienniku — analiza będzie "
             "się opierać na Twoich danych.",
         }
-    cutoff = datetime.now().date() - timedelta(days=days)
+    cutoff = localtime.today() - timedelta(days=days)
     filtered = [e for e in entries if _to_date(e["date"]) >= cutoff]
     if not filtered:
         return {

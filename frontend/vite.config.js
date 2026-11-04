@@ -34,6 +34,10 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         navigateFallback: "index.html",
+        // API nie może trafiać do fallbacku SPA
+        navigateFallbackDenylist: [/^\/api\//],
+        // obsługa push i kliknięcia w powiadomienie
+        importScripts: ["push-sw.js"],
       },
     }),
   ],

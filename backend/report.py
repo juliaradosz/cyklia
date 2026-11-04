@@ -14,6 +14,7 @@ import urllib.request
 from datetime import datetime
 
 import database as db
+import localtime
 import predict as pred
 
 FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
@@ -268,7 +269,7 @@ def render_pdf(d):
     pdf.add_font("DejaVu", "B", bold)
 
     name = (d["user"]["display_name"] or d["user"]["email"] or "Użytkowniczka")
-    today = datetime.now().strftime("%d.%m.%Y")
+    today = localtime.now().strftime("%d.%m.%Y")
 
     def heading(text, size=12, top=6):
         pdf.ln(top)

@@ -1,9 +1,11 @@
 import os
 import hashlib
+import hmac
 import functools
 import jwt
 import database as db
 from flask import jsonify, request
+from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SECRET_FILE = os.path.join(BASE_DIR, "secret.key")
@@ -23,8 +25,29 @@ ALGO = "HS256"
 TOKEN_TTL = 60 * 60 * 24 * 30  # 30 dni
 
 
-def hash_password(password):
+def _legacy_hash(password):
     return hashlib.sha256(("cyklia::" + password).encode("utf-8")).hexdigest()
+
+
+def hash_password(password):
+    """Bezpieczny skrót hasła (PBKDF2-SHA256 z losową solą)."""
+    return generate_password_hash(password, method="pbkdf2:sha256:600000")
+
+
+def verify_password(password, stored):
+    if not stored:
+        return False
+    if ":" in stored and "$" in stored:
+        try:
+            return check_password_hash(stored, password)
+        except ValueError:
+            return False
+    # konta założone przed zmianą: stary skrót SHA-256
+    return hmac.compare_digest(stored, _legacy_hash(password))
+
+
+def needs_rehash(stored):
+    return not (stored and stored.startswith("pbkdf2:"))
 
 
 def make_token(user_id):
@@ -53,7 +76,7 @@ def auth_required(fn):
         if not auth.startswith("Bearer "):
             return jsonify({"error": "Brak autoryzacji"}), 401
         uid = decode_token(auth[7:])
-        if uid is None:
+        if uid is None or not db.query_one("SELECT id FROM users WHERE id = ?", (uid,)):
             return jsonify({"error": "Sesja wygasła, zaloguj się ponownie"}), 401
         return fn(*args, user_id=uid, **kwargs)
 

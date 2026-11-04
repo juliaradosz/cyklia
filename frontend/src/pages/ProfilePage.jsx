@@ -4,6 +4,7 @@ import { useAuth } from "../api/auth.jsx";
 import { api, download } from "../api/client.js";
 import Icon from "../components/Icon.jsx";
 import StatsPage from "./StatsPage.jsx";
+import NotificationsSettings from "../components/NotificationsSettings.jsx";
 
 export default function ProfilePage() {
   const { user, logout, updateUser } = useAuth();
@@ -22,12 +23,18 @@ export default function ProfilePage() {
   const [pillName, setPillName] = useState(user?.pill_name || "");
   const [patchName, setPatchName] = useState(user?.patch_name || "");
   const [pillCycle, setPillCycle] = useState(user?.pill_cycle_days || 21);
-  const [pillBreak, setPillBreak] = useState(user?.pill_break_days || 7);
+  const [pillBreak, setPillBreak] = useState(user?.pill_break_days ?? 7);
   const [pillTime, setPillTime] = useState(user?.pill_time || "12:00");
   const [pillStart, setPillStart] = useState(user?.pill_start_date || "");
   const [saved, setSaved] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [pwCur, setPwCur] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwMsg, setPwMsg] = useState("");
+  const [delPw, setDelPw] = useState("");
+  const [delMsg, setDelMsg] = useState("");
 
   useEffect(() => {
     api("/pills")
@@ -52,7 +59,20 @@ export default function ProfilePage() {
   }
 
   async function save(extra = {}) {
-    await api("/me", {
+    setSaveError("");
+    const c = Number(cycle);
+    const p = Number(period);
+    if (!(c >= 14 && c <= 60)) {
+      setSaveError("Długość cyklu musi mieć od 14 do 60 dni.");
+      return;
+    }
+    if (!(p >= 1 && p <= 14)) {
+      setSaveError("Długość okresu musi mieć od 1 do 14 dni.");
+      return;
+    }
+    let me;
+    try {
+      me = await api("/me", {
       method: "PATCH",
       body: {
         display_name: name,
@@ -69,7 +89,11 @@ export default function ProfilePage() {
         ...extra,
       },
     });
-    updateUser({
+    } catch (err) {
+      setSaveError(err.message || "Nie udało się zapisać");
+      return;
+    }
+    updateUser(me || {
       display_name: name,
       cycle_length_default: Number(cycle),
       period_length_default: Number(period),
@@ -87,9 +111,36 @@ export default function ProfilePage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  function logoutNow() {
-    logout();
+  async function logoutNow() {
+    await logout();
     navigate("/login");
+  }
+
+  async function changePassword() {
+    setPwMsg("");
+    try {
+      await api("/me/password", {
+        method: "POST",
+        body: { current_password: pwCur, new_password: pwNew },
+      });
+      setPwCur("");
+      setPwNew("");
+      setPwMsg("✓ Hasło zmienione");
+    } catch (err) {
+      setPwMsg(err.message);
+    }
+  }
+
+  async function deleteAccount() {
+    setDelMsg("");
+    if (!window.confirm("Na pewno usunąć konto i wszystkie dane? Tego nie da się cofnąć.")) return;
+    try {
+      await api("/me", { method: "DELETE", body: { password: delPw } });
+      await logout();
+      navigate("/login");
+    } catch (err) {
+      setDelMsg(err.message);
+    }
   }
 
   const initial = (user?.display_name || user?.email || "?")[0] || "?";
@@ -133,6 +184,7 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {saveError && <div className="error">{saveError}</div>}
         <button className="btn block" onClick={() => save()}>
           {saved ? "✓ Zapisano" : "Zapisz ustawienia"}
         </button>
@@ -260,7 +312,7 @@ export default function ProfilePage() {
               <p className="muted" style={{ fontSize: 11, marginTop: 6 }}>
                 Podaj pierwszą datę, w której zaczęłaś nowy blister. Cyklia
                 policzy z niej: dni przyjmowania ({pillCycle || 21} dni),
-                potem {pillBreak || 7}-dniową przerwę i kolejny start — nawet
+                potem {pillBreak ?? 7}-dniową przerwę i kolejny start — nawet
                 gdy nie zaznaczasz okresu w kalendarzu.
               </p>
             </div>
@@ -332,6 +384,7 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {saveError && <div className="error">{saveError}</div>}
         <button className="btn block" onClick={() => save()}>
           {saved ? "✓ Zapisano" : "Zapisz ustawienia"}
         </button>
@@ -400,6 +453,20 @@ export default function ProfilePage() {
     );
   }
 
+  if (view === "notifications") {
+    return (
+      <div>
+        <div className="sub-screen-head">
+          <button className="icon-btn" onClick={() => setView("home")} aria-label="Wróć">
+            <Icon name="chevron-left" size={20} />
+          </button>
+          <h1>Powiadomienia</h1>
+        </div>
+        <NotificationsSettings />
+      </div>
+    );
+  }
+
   if (view === "account") {
     return (
       <div>
@@ -425,13 +492,55 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {saveError && <div className="error">{saveError}</div>}
         <button className="btn block mb" onClick={() => save()}>
           {saved ? "✓ Zapisano" : "Zapisz dane"}
         </button>
 
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico"><Icon name="lock" size={17} /></span>
+            <b>Zmień hasło</b>
+          </div>
+          <div className="field">
+            <label>Obecne hasło</label>
+            <input type="password" autoComplete="current-password" value={pwCur} onChange={(e) => setPwCur(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Nowe hasło (min. 6 znaków)</label>
+            <input type="password" autoComplete="new-password" value={pwNew} onChange={(e) => setPwNew(e.target.value)} />
+          </div>
+          {pwMsg && (
+            <div className={pwMsg.startsWith("✓") ? "muted" : "error"} style={{ marginBottom: 10 }}>{pwMsg}</div>
+          )}
+          <button className="btn ghost block" disabled={!pwCur || pwNew.length < 6} onClick={changePassword}>
+            Zmień hasło
+          </button>
+        </div>
+
         <button className="sheet-btn danger" onClick={logoutNow}>
           <Icon name="log-out" size={17} /> Wyloguj się
         </button>
+
+        <div className="j-section" style={{ marginTop: 18 }}>
+          <div className="j-sec-head">
+            <span className="js-ico" style={{ background: "var(--red-100)", color: "var(--red)" }}>
+              <Icon name="trash" size={17} />
+            </span>
+            <b>Usuń konto</b>
+          </div>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Usuwa konto i wszystkie dane: cykle, dziennik, tabletki, rozmowy.
+          </p>
+          <div className="field">
+            <label>Hasło (potwierdzenie)</label>
+            <input type="password" autoComplete="current-password" value={delPw} onChange={(e) => setDelPw(e.target.value)} />
+          </div>
+          {delMsg && <div className="error">{delMsg}</div>}
+          <button className="sheet-btn danger" disabled={!delPw} onClick={deleteAccount}>
+            <Icon name="trash" size={17} /> Usuń konto na zawsze
+          </button>
+        </div>
       </div>
     );
   }
@@ -461,6 +570,12 @@ export default function ProfilePage() {
             <Icon name="pill" size={19} />
           </span>
           <span className="sm-title">Antykoncepcja</span>
+        </button>
+        <button className="set-row" onClick={() => setView("notifications")}>
+          <span className="set-ico">
+            <Icon name="bell" size={19} />
+          </span>
+          <span className="sm-title">Powiadomienia</span>
         </button>
         <button className="set-row" onClick={() => setView("stats")}>
           <span className="set-ico">

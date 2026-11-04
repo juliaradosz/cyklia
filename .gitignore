@@ -5,6 +5,8 @@ __pycache__/
 backend/cyklia.db
 backend/secret.key
 backend/groq_key.py
+backend/vapid_private.pem
+backend/cron.key
 
 # Node
 node_modules/
