@@ -38,12 +38,16 @@ export default function Dashboard() {
   const [patchLog, setPatchLog] = useState(null);
   const [dayStatus, setDayStatus] = useState(null);
   const [pillTimeInput, setPillTimeInput] = useState(nowHM());
+  const [editTime, setEditTime] = useState(false);
+  const [pillErr, setPillErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const [sheet, setSheet] = useState(null);
   const [sexSel, setSexSel] = useState([]);
   const [libidoSel, setLibidoSel] = useState("");
   const [periodId, setPeriodId] = useState(null);
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
+  const [periodErr, setPeriodErr] = useState("");
   const today = todayISO();
   const [activeDay, setActiveDay] = useState(today);
   const [weekOffset, setWeekOffset] = useState(0);
@@ -154,9 +158,19 @@ export default function Dashboard() {
   let dayLine;
   let noteLine;
 
+  const pillBreakDay =
+    onPills && !patchMode && dayStatus?.pack_day != null && dayStatus.pack_day < 0
+      ? -dayStatus.pack_day
+      : null;
+
   if (periodDay) {
     phaseLabel = "Okres";
     noteLine = periodDay === 1 ? `Cykl trwał ${cycleLen} dni` : "Okres trwa";
+  } else if (pillBreakDay) {
+    // w przerwie między blistrami zwykle trwa krwawienie z odstawienia —
+    // odliczanie do „następnego okresu” za miesiąc byłoby mylące
+    phaseLabel = "Przerwa w tabletkach";
+    noteLine = "";
   } else if (countdown !== null) {
     phaseLabel =
       countdown > 0
@@ -177,7 +191,10 @@ export default function Dashboard() {
   } else if (onPills) {
     const pd = dayStatus?.pack_day;
     if (pd == null) dayLine = "Tabletki";
-    else if (pd < 0) dayLine = `Przerwa w tabletkach — dzień ${-pd}`;
+    else if (pd < 0)
+      dayLine = `Dzień ${-pd} z ${dayStatus.break_days}${
+        dayStatus.next_pack_start ? ` · nowy blister ${dayMonthPL(dayStatus.next_pack_start)}` : ""
+      }`;
     else dayLine = `Tabletki — dzień ${pd}${pd === 1 ? " · start pakietu" : ""}`;
   } else {
     dayLine = noteLine || "";
@@ -209,11 +226,31 @@ export default function Dashboard() {
   }
 
   function openPeriod() {
-    if (!currentPeriod) return;
-    setPeriodId(currentPeriod.id);
-    setPeriodStart(currentPeriod.start_date);
-    setPeriodEnd(currentPeriod.end_date || "");
+    if (currentPeriod) {
+      setPeriodId(currentPeriod.id);
+      setPeriodStart(currentPeriod.start_date);
+      setPeriodEnd(currentPeriod.end_date || "");
+    } else {
+      // brak trwającego okresu → dodawanie nowego (domyślnie wybrany dzień)
+      setPeriodId(null);
+      setPeriodStart(activeDay <= today ? activeDay : today);
+      setPeriodEnd("");
+    }
+    setPeriodErr("");
     setSheet("period");
+  }
+
+  async function endPeriodToday() {
+    if (!currentPeriod) return;
+    try {
+      await api(`/cycles/${currentPeriod.id}`, {
+        method: "PATCH",
+        body: { end_date: today },
+      });
+      reload();
+    } catch {
+      /* ignore */
+    }
   }
 
   function toggleSex(a) {
@@ -240,15 +277,28 @@ export default function Dashboard() {
   }
 
   async function savePeriod() {
+    setPeriodErr("");
+    if (!periodStart) {
+      setPeriodErr("Wybierz datę początku okresu.");
+      return;
+    }
+    if (periodEnd && periodEnd < periodStart) {
+      setPeriodErr("Koniec okresu nie może być przed początkiem.");
+      return;
+    }
     try {
-      await api(`/cycles/${periodId}`, {
-        method: "PATCH",
-        body: { start_date: periodStart, end_date: periodEnd || null },
-      });
+      if (periodId) {
+        await api(`/cycles/${periodId}`, {
+          method: "PATCH",
+          body: { start_date: periodStart, end_date: periodEnd || null },
+        });
+      } else {
+        await addPeriod(periodStart, periodEnd || undefined, 1);
+      }
       setSheet(null);
       reload();
-    } catch {
-      /* ignore */
+    } catch (err) {
+      setPeriodErr(err.message);
     }
   }
 
@@ -262,25 +312,41 @@ export default function Dashboard() {
     }
   }
 
-  async function logPill() {
+  async function logPill(newPack = false) {
+    if (
+      newPack &&
+      !window.confirm(
+        "Zaczynasz nowy blister już dziś? Cyklia przesunie harmonogram: okres wypadnie kilka dni po ostatniej tabletce z tego blistra."
+      )
+    )
+      return;
+    setPillErr("");
+    setBusy(true);
     try {
       const pl = await api("/pills/log", {
         method: "POST",
-        body: { time: pillTimeInput },
+        body: { date: today, time: editTime ? pillTimeInput : nowHM() },
       });
       setPillLog(pl);
-    } catch {
-      /* ignore */
+      setEditTime(false);
+      if (newPack) reload();
+    } catch (err) {
+      setPillErr(err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
   async function undoPill() {
+    setPillErr("");
     try {
-      const pl = await api("/pills/log", { method: "DELETE", body: {} });
+      const firstOfPack = pillLog?.pack_day === 1;
+      const pl = await api("/pills/log", { method: "DELETE", body: { date: today } });
       setPillLog(pl);
       setPillTimeInput(nowHM());
-    } catch {
-      /* ignore */
+      if (firstOfPack || pl?.in_break) reload();
+    } catch (err) {
+      setPillErr(err.message);
     }
   }
 
@@ -388,7 +454,7 @@ export default function Dashboard() {
             <span className="ds-b-ico">
               <Icon name="calendar" size={22} />
             </span>
-            Edytuj okres
+            {currentPeriod ? "Edytuj okres" : "Dodaj okres"}
           </button>
           <button className="ds-bubble" onClick={() => navigate("/dziennik")}>
             <span className="ds-b-ico">
@@ -405,38 +471,92 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {isTodayView && !patchMode && onPills && pillLog && pillLog.needs_log && (
-        <div className="dash-pill">
-          <div className="dp-ico">
-            <Icon name="pill" size={18} />
-          </div>
-          {pillLog.taken ? (
+      {isTodayView && !patchMode && onPills && pillLog && (pillLog.needs_log || pillLog.in_break) && (
+        <div className={`dash-pill${pillLog.taken ? " done" : ""}${pillLog.late ? " late" : ""}`}>
+          <div className="dp-row">
+            <div className="dp-ico">
+              <Icon name={pillLog.taken ? "check" : "pill"} size={20} />
+            </div>
             <div className="dp-body">
-              <b>
-                {pillLog.late ? "Wzięta spóźniona" : "Wzięta"} o {pillLog.taken_at}
-              </b>
-              <span className="dp-sub">{pillLog.warning || "Tabletka zalogowana"}</span>
+              {pillLog.taken ? (
+                <>
+                  <b>Tabletka wzięta o {pillLog.taken_at}</b>
+                  <span className="dp-sub">
+                    {pillLog.pack_day > 0
+                      ? `Dzień ${pillLog.pack_day} z ${pillLog.active_days}`
+                      : "Zapisano"}
+                    {pillLog.late ? " · spóźniona" : ""}
+                  </span>
+                </>
+              ) : pillLog.needs_log ? (
+                <>
+                  <b>Tabletka na dziś</b>
+                  <span className="dp-sub">
+                    {pillLog.pack_day > 0
+                      ? `Dzień ${pillLog.pack_day} z ${pillLog.active_days} · `
+                      : ""}
+                    zwykle o {pillLog.expected_time}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <b>Dziś bez tabletki</b>
+                  <span className="dp-sub">
+                    W przerwie zwykle pojawia się krwawienie.
+                    {pillLog.next_pack_start
+                      ? ` Nowy blister: ${dayMonthPL(pillLog.next_pack_start)}.`
+                      : ""}
+                  </span>
+                </>
+              )}
+            </div>
+            {pillLog.taken ? (
               <button className="dp-undo" onClick={undoPill}>
                 Cofnij
               </button>
-            </div>
-          ) : (
-            <div className="dp-body">
-              <b>Tabletka dzisiaj</b>
-              <span className="dp-sub">Zwykła pora: {pillLog.expected_time}</span>
-              <div className="dp-log">
-                <input
-                  type="time"
-                  className="pc-time"
-                  value={pillTimeInput}
-                  onChange={(e) => setPillTimeInput(e.target.value)}
-                />
-                <button className="btn small" onClick={logPill}>
-                  Wzięłam
+            ) : pillLog.needs_log ? (
+              <button className="btn small dp-take" disabled={busy} onClick={() => logPill(false)}>
+                <Icon name="check" size={16} /> Wzięłam
+              </button>
+            ) : null}
+          </div>
+
+          {pillLog.taken && pillLog.warning && <div className="dp-warn">{pillLog.warning}</div>}
+
+          {!pillLog.taken && pillLog.needs_log && (
+            <div className="dp-extra">
+              {editTime ? (
+                <label className="dp-time">
+                  Godzina przyjęcia
+                  <input
+                    type="time"
+                    value={pillTimeInput}
+                    onChange={(e) => setPillTimeInput(e.target.value)}
+                  />
+                </label>
+              ) : (
+                <button
+                  className="dp-link"
+                  onClick={() => {
+                    setPillTimeInput(nowHM());
+                    setEditTime(true);
+                  }}
+                >
+                  Wzięłam o innej godzinie
                 </button>
-              </div>
+              )}
             </div>
           )}
+
+          {!pillLog.taken && pillLog.in_break && (
+            <div className="dp-extra">
+              <button className="dp-link" disabled={busy} onClick={() => logPill(true)}>
+                Zaczynam nowy blister dziś
+              </button>
+            </div>
+          )}
+
+          {pillErr && <div className="dp-warn">{pillErr}</div>}
         </div>
       )}
 
@@ -508,7 +628,14 @@ export default function Dashboard() {
           }}
         >
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Icon name="calendar" size={17} /> Zaznacz początek okresu
+            <Icon name="droplet" size={17} /> Okres zaczął się dziś
+          </span>
+        </button>
+      )}
+      {isTodayView && currentPeriod && !currentPeriod.end_date && (
+        <button className="btn ghost block mt" onClick={endPeriodToday}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Icon name="check" size={17} /> Okres skończył się dziś
           </span>
         </button>
       )}
@@ -553,11 +680,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      {sheet === "period" && currentPeriod && (
+      {sheet === "period" && (
         <div className="sheet-overlay" onClick={() => setSheet(null)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <div className="sheet-head">
-              <b>Edytuj okres</b>
+              <b>{periodId ? "Edytuj okres" : "Dodaj okres"}</b>
               <button className="icon-btn" onClick={() => setSheet(null)} aria-label="Zamknij">
                 <Icon name="x" size={18} />
               </button>
@@ -574,14 +701,18 @@ export default function Dashboard() {
               type="date"
               className="sheet-input"
               value={periodEnd}
+              min={periodStart || undefined}
               onChange={(e) => setPeriodEnd(e.target.value)}
             />
+            {periodErr && <div className="error mt">{periodErr}</div>}
             <button className="btn block mt" onClick={savePeriod}>
-              Zapisz zmiany
+              {periodId ? "Zapisz zmiany" : "Dodaj okres"}
             </button>
-            <button className="btn ghost block danger mt" onClick={deletePeriod}>
-              Usuń ten okres
-            </button>
+            {periodId && (
+              <button className="btn ghost block danger mt" onClick={deletePeriod}>
+                Usuń ten okres
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -455,56 +455,6 @@ export default function JournalPage() {
           </div>
         </div>
 
-        <div className="j-section">
-          <div className="j-sec-head">
-            <span className="js-ico">
-              <Icon name="sparkles" size={17} />
-            </span>
-            <b>Analiza AI Twojego dziennika</b>
-          </div>
-          {aiBusy ? (
-            <p className="h-text">Analizuję Twoje wpisy… to może chwilę potrwać.</p>
-          ) : ai ? (
-            <>
-              <p className="h-text">{ai.text}</p>
-              {ai.ai && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Analiza przygotowana przez AI · to nie diagnoza</div>}
-              <button
-                type="button"
-                className="show-more"
-                onClick={runAi}
-                disabled={aiBusy}
-              >
-                Odśwież analizę
-              </button>
-            </>
-          ) : (
-            <button type="button" className="btn small" onClick={runAi} disabled={aiBusy}>
-              Analizuj moje wpisy
-            </button>
-          )}
-        </div>
-
-        <div className="j-section">
-          <div className="j-sec-head">
-            <span className="js-ico">
-              <Icon name="droplet" size={17} />
-            </span>
-            <b>Krwawienie</b>
-          </div>
-          <div className="symptoms-grid">
-            {BLEEDING.map((b) => (
-              <button
-                key={b}
-                type="button"
-                className={`symptom-chip ${form.bleeding.includes(b) ? "on" : ""}`}
-                onClick={() => toggleIn("bleeding", b)}
-              >
-                {b}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {patchMode ? (
           patchLog && (
             <div className="j-section">
@@ -584,40 +534,6 @@ export default function JournalPage() {
         <div className="j-section">
           <div className="j-sec-head">
             <span className="js-ico">
-              <Icon name="heart" size={17} />
-            </span>
-            <b>Seks i libido</b>
-          </div>
-          <div className="sex-grid">
-            {SEX_ACT.map((a) => (
-              <button
-                key={a}
-                type="button"
-                className={`sex-chip ${form.sex.includes(a) ? "on" : ""}`}
-                onClick={() => toggleIn("sex", a)}
-              >
-                {a}
-              </button>
-            ))}
-          </div>
-          <div className="j-sub-label">Libido</div>
-          <div className="sex-grid">
-            {LIBIDO.map((l) => (
-              <button
-                key={l}
-                type="button"
-                className={`sex-chip ${form.libido === l ? "on" : ""}`}
-                onClick={() => setOne("libido", l)}
-              >
-                {l}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="j-section">
-          <div className="j-sec-head">
-            <span className="js-ico">
               <Icon name="sun" size={17} />
             </span>
             <b>Samopoczucie</b>
@@ -666,6 +582,61 @@ export default function JournalPage() {
               {showAllSymptoms ? "Pokaż mniej" : "Pokaż więcej"}
             </button>
           )}
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="droplet" size={17} />
+            </span>
+            <b>Krwawienie</b>
+          </div>
+          <div className="symptoms-grid">
+            {BLEEDING.map((b) => (
+              <button
+                key={b}
+                type="button"
+                className={`symptom-chip ${form.bleeding.includes(b) ? "on" : ""}`}
+                onClick={() => toggleIn("bleeding", b)}
+              >
+                {b}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="heart" size={17} />
+            </span>
+            <b>Seks i libido</b>
+          </div>
+          <div className="sex-grid">
+            {SEX_ACT.map((a) => (
+              <button
+                key={a}
+                type="button"
+                className={`sex-chip ${form.sex.includes(a) ? "on" : ""}`}
+                onClick={() => toggleIn("sex", a)}
+              >
+                {a}
+              </button>
+            ))}
+          </div>
+          <div className="j-sub-label">Libido</div>
+          <div className="sex-grid">
+            {LIBIDO.map((l) => (
+              <button
+                key={l}
+                type="button"
+                className={`sex-chip ${form.libido === l ? "on" : ""}`}
+                onClick={() => setOne("libido", l)}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="j-section">
@@ -891,6 +862,35 @@ export default function JournalPage() {
             placeholder="Jak się czujesz? Co Cię cieszyło lub męczyło?"
             style={{ background: "var(--surface-2)", border: "1px solid var(--line-strong)", borderRadius: 14, padding: 13, width: "100%", minHeight: 84, outline: "none", fontSize: 14 }}
           />
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="sparkles" size={17} />
+            </span>
+            <b>Analiza AI Twojego dziennika</b>
+          </div>
+          {aiBusy ? (
+            <p className="h-text">Analizuję Twoje wpisy… to może chwilę potrwać.</p>
+          ) : ai ? (
+            <>
+              <p className="h-text">{ai.text}</p>
+              {ai.ai && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Analiza przygotowana przez AI · to nie diagnoza</div>}
+              <button
+                type="button"
+                className="show-more"
+                onClick={runAi}
+                disabled={aiBusy}
+              >
+                Odśwież analizę
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn small" onClick={runAi} disabled={aiBusy}>
+              Analizuj moje wpisy
+            </button>
+          )}
         </div>
 
         <div className="j-sticky">

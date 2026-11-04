@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCalendar } from "../hooks.js";
+import { useAuth } from "../api/auth.jsx";
 import { api } from "../api/client.js";
 import {
   todayISO,
@@ -41,6 +42,7 @@ function monthCells(y, m) {
 
 export default function CalendarPage() {
   const { data, reload } = useCalendar();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const today = todayISO();
   const t = parseISO(today);
@@ -142,6 +144,23 @@ export default function CalendarPage() {
     [data]
   );
 
+  // prognozowany okres (kolejne 3 cykle) — tylko dni, które nie są już okresem
+  const predictedDays = useMemo(() => {
+    const s = new Set();
+    const p = data?.prediction;
+    if (!p?.next_period_start) return s;
+    const per = Math.max(1, Number(p.period_length) || 5);
+    const len = Math.max(14, Number(p.cycle_length) || 28);
+    for (let c = 0; c < 3; c++) {
+      const start = addDays(p.next_period_start, c * len);
+      for (let i = 0; i < per; i++) {
+        const d = addDays(start, i);
+        if (d >= todayISO() && !periodDays.has(d)) s.add(d);
+      }
+    }
+    return s;
+  }, [data, periodDays]);
+
   const sexDays = useMemo(() => {
     const s = new Set();
     (entries || []).forEach((e) => {
@@ -195,15 +214,25 @@ export default function CalendarPage() {
       : null;
     const dayStr = dayOfCycle ? `dzień ${dayOfCycle} cyklu` : "cykl";
     if (dayType === "period") return `Okres · ${dayStr}`;
+    if (predictedDays.has(day)) return "Prognozowany okres";
     if (dayType === "ovulation") return `Owulacja · ${dayStr}`;
     if (dayType === "fertile") return `Dni płodne · ${dayStr}`;
     if (dayOfCycle) return `${dayOfCycle}. dzień cyklu`;
     return "Dzień cyklu";
   }
 
+  function dayClass(day) {
+    if (periodDays.has(day)) return " period";
+    if (predictedDays.has(day)) return " predicted";
+    const t = data.days[day];
+    if (t === "ovulation") return " ovulation";
+    if (t === "fertile") return " fertile";
+    return "";
+  }
+
   function openDay(day) {
     setSelected(day);
-    setPillTime("12:00");
+    setPillTime(user?.pill_time || "12:00");
     setEntry(null);
     setSelStatus(null);
     api(`/entries/${day}`)
@@ -248,6 +277,7 @@ export default function CalendarPage() {
       setSelStatus(s);
       const p = await api("/pills/log/dates").catch(() => ({ dates: [] }));
       setPillDates(p?.dates || []);
+      reload();
     } catch (err) {
       alert(err.message || "Nie udało się zapisać");
     } finally {
@@ -265,6 +295,7 @@ export default function CalendarPage() {
       setSelStatus(s);
       const p = await api("/pills/log/dates").catch(() => ({ dates: [] }));
       setPillDates(p?.dates || []);
+      reload();
     } catch {
       /* ignore */
     } finally {
@@ -302,15 +333,56 @@ export default function CalendarPage() {
     }
   }
 
+  // okres (zarejestrowany), do którego należy wybrany dzień
+  const selectedCycle = selected
+    ? [...cycles]
+        .filter((c) => c.start_date <= selected)
+        .sort((a, b) => a.start_date.localeCompare(b.start_date))
+        .pop() || null
+    : null;
+
+  async function deleteSelectedPeriod() {
+    if (!selectedCycle) return;
+    if (!window.confirm(`Usunąć okres rozpoczęty ${formatPL(selectedCycle.start_date)}?`)) return;
+    setBusy(true);
+    try {
+      await api(`/cycles/${selectedCycle.id}`, { method: "DELETE" });
+      const c = await api("/cycles").catch(() => []);
+      setCycles(c || []);
+      reload();
+    } catch (err) {
+      alert(err.message || "Nie udało się usunąć");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function markPeriodEnd() {
+    if (!selectedCycle) return;
+    setBusy(true);
+    try {
+      await api(`/cycles/${selectedCycle.id}`, {
+        method: "PATCH",
+        body: { end_date: selected },
+      });
+      reload();
+    } catch (err) {
+      alert(err.message || "Nie udało się zapisać");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function markPeriodStart() {
     if (!selected) return;
     setBusy(true);
     try {
+      const per = Math.max(1, Number(user?.period_length_default) || 5);
       await api("/cycles", {
         method: "POST",
         body: {
           start_date: selected,
-          end_date: addDays(selected, 4),
+          end_date: addDays(selected, per - 1),
         },
       });
       const c = await api("/cycles").catch(() => []);
@@ -379,6 +451,14 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      <div className="cal-legend">
+        <span><i className="lg period" /> Okres</span>
+        <span><i className="lg predicted" /> Prognoza</span>
+        {!onPills && <span><i className="lg fertile" /> Dni płodne</span>}
+        {!onPills && <span><i className="lg ovulation" /> Owulacja</span>}
+        {onPills && <span><Icon name="pill" size={10} className="picon" /> Tabletka</span>}
+      </div>
+
       {view === "month" ? (
         <div className="cal-scroll" ref={scrollRef}>
           {monthList.map((mn) => {
@@ -402,9 +482,7 @@ export default function CalendarPage() {
                     c.inMonth ? (
                       <button
                         key={i}
-                        className={`cal-sday${c.iso === today ? " today" : ""}${
-                          periodDays.has(c.iso) ? " period" : ""
-                        }`}
+                        className={`cal-sday${c.iso === today ? " today" : ""}${dayClass(c.iso)}`}
                         onClick={() => openDay(c.iso)}
                         aria-label={formatPL(c.iso)}
                       >
@@ -469,8 +547,10 @@ export default function CalendarPage() {
                         <span
                           key={c.iso}
                           className={`ycell${periodDays.has(c.iso) ? " p" : ""}${
-                            c.iso === today ? " t" : ""
-                          }`}
+                            predictedDays.has(c.iso) ? " pp" : ""
+                          }${
+                            data.days[c.iso] === "fertile" || data.days[c.iso] === "ovulation" ? " f" : ""
+                          }${c.iso === today ? " t" : ""}`}
                         >
                           <span className="ynum">{c.day}</span>
                           <span className="ymark">
@@ -530,17 +610,34 @@ export default function CalendarPage() {
               </button>
             </div>
 
-            <button
-              className={`sheet-btn ${selectedIsPeriod ? "done" : "soft"}`}
-              onClick={markPeriodStart}
-              disabled={busy || selectedIsPeriod}
-              style={{ marginBottom: 10 }}
-            >
-              <Icon name={selectedIsPeriod ? "check" : "droplet"} size={17} />
-              {selectedIsPeriod
-                ? "Ten dzień jest oznaczony jako okres"
-                : "Okres zaczął się tego dnia"}
-            </button>
+            {selected > today ? (
+              <p className="muted" style={{ fontSize: 13, margin: "0 0 10px" }}>
+                To dzień w przyszłości
+                {predictedDays.has(selected) ? " — prognozowany okres." : "."} Okres
+                zaznaczysz, gdy się zacznie.
+              </p>
+            ) : selectedIsPeriod && selectedCycle ? (
+              <div className="sheet-actions">
+                {selected !== selectedCycle.start_date &&
+                  selected !== selectedCycle.end_date && (
+                    <button className="sheet-btn soft" onClick={markPeriodEnd} disabled={busy}>
+                      <Icon name="check" size={16} /> Okres skończył się tego dnia
+                    </button>
+                  )}
+                <button className="sheet-btn danger" onClick={deleteSelectedPeriod} disabled={busy}>
+                  <Icon name="trash" size={16} /> Usuń ten okres
+                </button>
+              </div>
+            ) : (
+              <button
+                className="sheet-btn soft"
+                onClick={markPeriodStart}
+                disabled={busy}
+                style={{ marginBottom: 10 }}
+              >
+                <Icon name="droplet" size={17} /> Okres zaczął się tego dnia
+              </button>
+            )}
 
             <div className="sheet-row">
               <span className="sr-label">Objawy</span>
@@ -596,9 +693,36 @@ export default function CalendarPage() {
                   Tabletka antykoncepcyjna
                 </div>
                 {!selStatus.needs_log ? (
-                  <div className="sr-value" style={{ textAlign: "left" }}>
-                    Dzień przerwy — bez tabletki
-                  </div>
+                  <>
+                    <div className="sr-value" style={{ textAlign: "left" }}>
+                      Dzień przerwy — bez tabletki
+                    </div>
+                    {selected <= today && (
+                      <div className="pill-log-row">
+                        <input
+                          type="time"
+                          className="pc-time"
+                          value={pillTime}
+                          onChange={(e) => setPillTime(e.target.value)}
+                        />
+                        <button
+                          className="sheet-btn soft"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Zaczęłaś nowy blister tego dnia? Harmonogram i prognoza okresu przesuną się."
+                              )
+                            )
+                              markPill();
+                          }}
+                          disabled={busy}
+                          style={{ padding: "10px 14px" }}
+                        >
+                          <Icon name="pill" size={16} /> Nowy blister
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : selStatus.taken ? (
                   <>
                     <div className="sr-value" style={{ textAlign: "left" }}>
@@ -617,6 +741,11 @@ export default function CalendarPage() {
                       <Icon name="trash" size={16} /> Cofnij tabletkę
                     </button>
                   </>
+                ) : selected > today ? (
+                  <div className="sr-value" style={{ textAlign: "left" }}>
+                    Dzień z tabletką
+                    {selStatus.pack_day > 0 ? ` (${selStatus.pack_day}. w blistrze)` : ""}
+                  </div>
                 ) : (
                   <div className="pill-log-row">
                     <input

@@ -68,29 +68,36 @@
 - Długość cyklu = ustawienie z profilu, a gdy brak — średnia odstępów między
   zapisanymi początkami okresów (domyślnie 28).
 - Następny okres = ostatni początek + długość cyklu (przesuwany o kolejne
-  cykle, dopóki nie wypadnie po dzisiejszym dniu).
+  cykle, dopóki nie wypadnie dziś lub później — w dniu prognozy aplikacja pokazuje „okres — dziś!”).
 - Owulacja = następny okres − 14 dni. Dni płodne = owulacja −5 … +1.
 
 ### Tabletki / plastry
 - Brak owulacji i dni płodnych.
-- Następny okres = początek najbliższej przerwy: `kotwica + dni_aktywne + k·(aktywne+przerwa)`.
+- **Prognoza okresu przy tabletkach = 2 dni po ostatniej tabletce blistra**
+  (jak w ulotkach: krwawienie z odstawienia zwykle 2–3 dni po ostatniej
+  tabletce; przy przerwie krótszej niż 2 dni — w ostatnim dniu przerwy):
+  `kotwica + dni_aktywne − 1 + min(2, przerwa)`, powtarzane co
+  `aktywne + przerwa` dni, aż wypadnie dziś lub później.
+- Tabletki bez przerwy (np. Cerazette, schemat 28+0): **brak prognozy okresu**.
+- Kalendarz zwraca też `next_pack_start` (dzień 1 kolejnego blistra) i
+  `last_pill_date` (ostatnia tabletka bieżącego blistra).
 - Plastry: stały schemat 21+7 liczony od początku okresu (zmiana w dni 1, 8,
   15; zdjęcie w dniu 22; przerwa 23–28).
 - W kalendarzu przy antykoncepcji okres pokazywany jest **tylko z rejestracji
   użytkowniczki** (nie z prognozy).
 
 ### Kotwica blistra (`pillsched.pill_anchor`)
-- Szuka w dzienniku tabletek ostatniego „początku blistra” = wpisu, przed
-  którym była przerwa w logowaniu ≥ `max(2, (przerwa+1)//2 + 1)` dni
-  (dla 21+7 → 5 dni). Dzięki temu:
-  - wcześniej rozpoczęty blister przesuwa prognozę okresu wcześniej,
-  - pojedynczy zapomniany wpis nie resetuje blistra,
-  - codzienne zaznaczanie **nie przesuwa** kotwicy (dawny błąd: brano najstarszy
-    wpis z ostatnich 28 dni, więc kotwica „jechała” z każdym dniem i np. 3.
-    dzień nowego blistra był pokazywany jako przerwa).
-- Jeśli ostatni początek blistra jest starszy niż jeden pełny cykl → data
-  startu z profilu; gdy jej brak → ostatni znaleziony początek.
-- Przy przerwie 0 dni kotwica = data z profilu (tabletka codziennie).
+Dzień 1 bieżącego blistra liczony z **faktycznie zaznaczonych tabletek**.
+Przechodzimy po wpisach od najstarszego, startując od daty z profilu (jeśli jest):
+- wpis sprzed daty startu z profilu → ignorowany,
+- **tabletka zaznaczona w dniu, który wg harmonogramu jest przerwą →
+  nowy blister od tego dnia** (zaczęty wcześniej); harmonogram, dni
+  przerwy i prognoza okresu przesuwają się,
+- tabletka po luce dłuższej niż `przerwa + 1` dni → nowy blister od tego dnia
+  (zaczęty później niż planowo),
+- tabletka w dniu aktywnym → trzyma się harmonogramu (pojedynczy zapomniany
+  wpis niczego nie przesuwa; codzienne zaznaczanie nie przesuwa kotwicy),
+- brak wpisów i brak daty w profilu → brak kotwicy.
 
 ### Klasyfikacja dnia (`day_type_for`)
 `period` (zarejestrowany okres; bez daty końca = długość okresu z profilu),
@@ -98,8 +105,11 @@
 
 ## 6. Tabletki — dzienny log
 
-- `GET/POST/DELETE /api/pills/log` (+ `?date=`). Zapis tylko w dni aktywne
-  (w przerwie → błąd 400).
+- `GET/POST/DELETE /api/pills/log` (+ `?date=`). Zapis także w dniu przerwy
+  (= nowy blister wcześniej, patrz kotwica). Nie można zaznaczyć tabletki
+  w przyszłości.
+- Status zwraca m.in. `pack_day`, `in_break`, `active_days`, `break_days`,
+  `next_pack_start`, `next_period_start`, `taken`, `taken_at`, `late`, `warning`.
 - `pack_day`: dzień blistra (1…n) albo ujemny numer dnia przerwy.
 - Spóźnienie: tabletka wzięta później niż 12 godz. (progestagenowe/bez
   przerwy: 3 godz.) po ustawionej porze → ostrzeżenie o możliwym spadku
@@ -139,7 +149,33 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   powiadomienia na telefonach).
 - iPhone: push działa tylko z aplikacji dodanej do ekranu głównego (iOS 16.4+).
 
-## 8. Dziennik, statystyki, raport, czat
+## 8. Ekrany (zachowanie interfejsu)
+
+- **Start**: tydzień (przesuwany), duży napis z odliczaniem do okresu
+  („X dni do okresu”, „okres — dziś!”). W dniu okresu: „Okres / Dzień N”.
+  W przerwie między blistrami: „Przerwa w tabletkach / Dzień X z Y · nowy
+  blister …” (bez mylącego odliczania do okresu za miesiąc).
+- **Karta tabletki** (Start): w dzień aktywny przycisk „Wzięłam” (zapisuje
+  bieżącą godzinę; „Wzięłam o innej godzinie” pozwala ją zmienić), po
+  zapisaniu zielony stan z „Cofnij” i ewentualnym ostrzeżeniem o spóźnieniu.
+  W przerwie: „Dziś bez tabletki” + „Zaczynam nowy blister dziś” (z
+  potwierdzeniem).
+- Przycisk „Dodaj okres / Edytuj okres” otwiera arkusz z datą początku i
+  końca (dodawanie, gdy okres nie trwa; edycja i usuwanie, gdy trwa).
+  Pod spodem: „Okres zaczął się dziś” albo „Okres skończył się dziś”.
+- **Kalendarz**: legenda; okres zarejestrowany = pełne różowe kółko,
+  prognoza (3 kolejne okresy) = przerywane obramowanie, dni płodne =
+  jasnoniebieskie, owulacja = niebieskie (tylko bez antykoncepcji), ikonka
+  tabletki = zaznaczona tabletka. Dzień w przyszłości: brak zaznaczania
+  okresu/tabletki. Dzień okresu: „Okres skończył się tego dnia”, „Usuń ten
+  okres”. Dzień przerwy w tabletkach: „Nowy blister”. Nowy okres
+  z kalendarza ma długość z profilu.
+- **Objawy (dziennik)**: kolejność sekcji: tabletka/plaster, samopoczucie,
+  objawy, krwawienie, seks i libido, wydzielina, trawienie, ciało, ruch i
+  sen, temperatura i waga, notatka, analiza AI.
+- API odrzuca okres zaczynający się w przyszłości.
+
+## 9. Dziennik, statystyki, raport, czat
 
 - Dziennik (`PUT /api/entries/<dzień>`): nastrój, objawy, temperatura, waga,
   libido, śluz, stres, sen, woda, aktywność, kroki, seks, krwawienie, trawienie,
@@ -154,10 +190,16 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   `groq_key.py`) lub z lokalnych reguł. Asystent dostaje kontekst kalendarza
   (dzień cyklu, następny okres, owulacja, tabletka/plaster).
 
-## 9. Historia zmian logiki
+## 10. Historia zmian logiki
 
 - **2026-11-04** — strefa czasowa Polski na serwerze; poprawiona kotwica
   blistra; zapis długości okresu (1–14); przerwa 0 dni w tabletkach;
   walidacja dat okresu (koniec ≥ początek); bezpieczne hasła PBKDF2 z migracją;
   zmiana hasła i usuwanie konta; automatyczne wylogowanie po 401;
   powiadomienia push (tabletka, plaster, okres, dni płodne) + cron.
+- **2026-11-04 (2)** — harmonogram tabletek z faktycznie zaznaczonych
+  tabletek (tabletka w przerwie = nowy blister), okres prognozowany 2 dni po
+  ostatniej tabletce, brak prognozy dla tabletek bez przerwy; „okres dziś”
+  pokazywany w dniu prognozy; nowa karta tabletki; dodawanie/kończenie/
+  usuwanie okresu ze Startu i kalendarza; prognoza, dni płodne i legenda
+  w kalendarzu; blokada dat w przyszłości; nowa kolejność dziennika.

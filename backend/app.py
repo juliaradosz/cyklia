@@ -232,8 +232,13 @@ def create_app():
             datetime.strptime(taken_at, "%H:%M")
         except ValueError:
             return jsonify({"error": "Podaj godzinę w formacie HH:MM"}), 400
-        if not _pill_status(user_id, day)["needs_log"]:
-            return jsonify({"error": "Dziś jest dzień przerwy — nie przyjmujesz tabletki."}), 400
+        if day > localtime.today_iso():
+            return jsonify({"error": "Nie można zaznaczyć tabletki w przyszłości."}), 400
+        status = _pill_status(user_id, day)
+        if not status["on_pills"]:
+            return jsonify({"error": "Włącz tryb tabletek w profilu (Antykoncepcja)."}), 400
+        # Tabletka w dniu przerwy jest dozwolona: oznacza rozpoczęcie nowego
+        # blistra wcześniej — harmonogram i prognoza okresu przesuwają się.
         db.execute(
             "INSERT INTO pill_logs (user_id, date, taken_at, created_at) "
             "VALUES (?, ?, ?, ?) "
@@ -331,6 +336,8 @@ def create_app():
             datetime.strptime(start, "%Y-%m-%d")
         except (ValueError, TypeError):
             return jsonify({"error": "Podaj poprawną datę rozpoczęcia"}), 400
+        if start > localtime.today_iso():
+            return jsonify({"error": "Okres nie może zaczynać się w przyszłości"}), 400
         if end:
             try:
                 datetime.strptime(end, "%Y-%m-%d")
@@ -1097,9 +1104,18 @@ def _pill_status(user_id, day):
                 f"porze ({expected}). Możliwy spadek skuteczności — sprawdź ulotkę "
                 f"albo skonsultuj się z lekarzem."
             )
+    brk_n = _pill_break_value(user)
+    active_n = user["pill_cycle_days"] or 21
     return {
         "date": day,
         "on_pills": on_pills,
+        "pill_name": user.get("pill_name") or "",
+        "active_days": active_n,
+        "break_days": brk_n,
+        "in_break": bool(on_pills and pack_day is not None and pack_day < 0),
+        "next_pack_start": pred.get("next_pack_start"),
+        "last_pill_date": pred.get("last_pill_date"),
+        "next_period_start": pred.get("next_period_start"),
         "day_type": day_type,
         "needs_log": needs_log,
         "pack_day": pack_day,

@@ -33,6 +33,24 @@ def next_break_start(anchor, active, total, today):
     return start
 
 
+def withdrawal_bleed_offset(brk):
+    """Ile dni po OSTATNIEJ tabletce zwykle zaczyna się krwawienie
+    z odstawienia (ulotki: 2–3 dni) — nie dłużej niż sama przerwa."""
+    return max(1, min(2, int(brk)))
+
+
+def next_withdrawal_bleed(anchor, active, total, brk, today):
+    """Prognozowany okres przy tabletkach: kilka dni po ostatniej tabletce
+    bieżącego (lub kolejnego) blistra. Bez przerwy (np. Cerazette) → None."""
+    if brk <= 0:
+        return None
+    last_pill = anchor + timedelta(days=active - 1)
+    d = last_pill + timedelta(days=withdrawal_bleed_offset(brk))
+    while d < today:
+        d += timedelta(days=total)
+    return d
+
+
 def build_calendar(
     start_dates,
     cycle_length=None,
@@ -65,12 +83,20 @@ def build_calendar(
             # (lub data startu z profilu). Następny okres = początek
             # najbliższej przerwy między blistrami — wcześniej przyjęta
             # tabletka przesuwa prognozę okresu wcześniej.
-            next_start = next_break_start(parse_date(pill_start), active, total, today)
+            anchor = parse_date(pill_start)
+            next_start = next_withdrawal_bleed(anchor, active, total, brk, today)
+            # dzień 1 kolejnego blistra (po przerwie)
+            next_pack = anchor + timedelta(days=total)
+            while next_pack <= today:
+                next_pack += timedelta(days=total)
             return {
                 "has_data": True,
+                "pill_anchor": iso(anchor),
+                "next_pack_start": iso(next_pack) if brk > 0 else None,
+                "last_pill_date": iso(next_pack - timedelta(days=brk + 1)) if brk > 0 else None,
                 "on_pills": True,
                 "method": method,
-                "next_period_start": iso(next_start),
+                "next_period_start": iso(next_start) if next_start else None,
                 "ovulation_date": None,
                 "fertile_start": None,
                 "fertile_end": None,
@@ -81,7 +107,7 @@ def build_calendar(
         if start_dates:
             last = start_dates[-1]
             next_start = last + timedelta(days=total)
-            while next_start <= today:
+            while next_start < today:
                 next_start += timedelta(days=total)
             return {
                 "has_data": True,
@@ -128,7 +154,7 @@ def build_calendar(
     today = localtime.today()
     # Przewidywany kolejny okres może wypaść przed dziś, jeśli cykl się opóźnia.
     next_start = last + timedelta(days=cycle)
-    while next_start <= today:
+    while next_start < today:
         next_start += timedelta(days=cycle)
 
     ovulation = next_start - timedelta(days=14)

@@ -12,15 +12,17 @@ def _break_days(user):
 
 
 def pill_anchor(user_id, user):
-    """Dzień 1 bieżącego blistra.
+    """Dzień 1 bieżącego blistra, wyliczany z faktycznie zaznaczonych tabletek.
 
-    Szuka w dzienniku tabletek ostatniego „początku blistra”, czyli wpisu,
-    przed którym była przerwa (brak wpisów przez kilka dni). Dzięki temu
-    wcześniej rozpoczęty blister przesuwa prognozę okresu wcześniej, a
-    codzienne zaznaczanie tabletek NIE przesuwa kotwicy (wcześniej brano
-    najstarszy wpis z ostatnich 28 dni, który zmieniał się każdego dnia).
-
-    Gdy w ostatnim cyklu nie ma wpisów — data rozpoczęcia z profilu.
+    Zasady (przechodzimy po wpisach od najstarszego):
+    - punkt wyjścia: data startu blistra z profilu (jeśli jest),
+    - tabletka zaznaczona w dniu, który wg harmonogramu jest PRZERWĄ, oznacza
+      rozpoczęcie nowego blistra wcześniej → nowy blister liczy się od tego dnia,
+    - tabletka po dłuższej niż przerwa luce (brak wpisów) też rozpoczyna nowy
+      blister (start później niż planowo),
+    - tabletka w dniu aktywnym trzyma się harmonogramu (pojedynczy zapomniany
+      wpis nic nie przesuwa).
+    Dzięki temu okres zawsze wypada kilka dni po ostatniej tabletce z blistra.
     """
     active = int(user.get("pill_cycle_days") or 21)
     brk = _break_days(user)
@@ -28,34 +30,40 @@ def pill_anchor(user_id, user):
     profile_start = user.get("pill_start_date") or None
     today = localtime.today()
 
-    if brk == 0:
-        # Tabletki bez przerwy — kotwica ma znaczenie tylko informacyjne.
-        return profile_start
+    anchor = None
+    if profile_start:
+        try:
+            anchor = datetime.strptime(profile_start, "%Y-%m-%d").date()
+        except ValueError:
+            anchor = None
 
     rows = db.query(
         "SELECT date FROM pill_logs WHERE user_id = ? AND date <= ? ORDER BY date",
         (user_id, today.isoformat()),
     )
-    dates = []
+    prev = None
     for r in rows:
         try:
-            dates.append(datetime.strptime(r["date"], "%Y-%m-%d").date())
+            d = datetime.strptime(r["date"], "%Y-%m-%d").date()
         except (TypeError, ValueError):
             continue
-
-    # Przerwa w logowaniu uznawana za przerwę między blistrami. Tolerujemy
-    # krótszą przerwę (wcześniejszy start nowego blistra), ale pojedynczy
-    # zapomniany wpis nie resetuje blistra.
-    gap_needed = max(2, (brk + 1) // 2 + 1)
-    pack_start = None
-    prev = None
-    for d in dates:
-        if prev is None or (d - prev).days >= gap_needed:
-            pack_start = d
+        if anchor is None:
+            anchor = d
+        else:
+            pos = (d - anchor).days
+            if pos < 0:
+                # wpis sprzed daty startu z profilu — ignorujemy
+                continue
+            if brk == 0:
+                anchor = anchor + timedelta(days=(pos // total) * total)
+            elif prev is not None and (d - prev).days > brk + 1 and pos % total != 0:
+                # dłuższa przerwa niż w schemacie → nowy blister od dziś
+                anchor = d
+            elif pos % total >= active:
+                # tabletka w dniu przerwy → nowy blister zaczęty wcześniej
+                anchor = d
+            else:
+                anchor = anchor + timedelta(days=(pos // total) * total)
         prev = d
 
-    if pack_start and pack_start > today - timedelta(days=total):
-        return pack_start.isoformat()
-    if profile_start:
-        return profile_start
-    return pack_start.isoformat() if pack_start else None
+    return anchor.isoformat() if anchor else None
