@@ -515,7 +515,8 @@ def partner_text(user_id, feel, name, extra=""):
             f"Dziś: {extra or 'brak szczegółów'}. Faza cyklu: {phase or 'nieznana'}. "
             f"W podobne dni {name} najczęściej notowała objawy: {syms}; nastroje: {mds}. "
             f"Napisz 2–4 zdania po polsku, zwracając się do partnera na „ty”: jak {name} "
-            "może się dziś czuć i jak może ją wesprzeć. Ciepło, konkretnie, bez list, "
+            "może się dziś czuć i jak konkretnie może poprawić jej dzień (jeśli dziś sama "
+            "wpisała objawy, nastrój lub czego potrzebuje — to jest najważniejsze). Ciepło, konkretnie, bez list, "
             "procentów i bez straszenia. O niej pisz w trzeciej osobie (ona)."
         )
         messages = [

@@ -9,7 +9,10 @@ import NotificationsSettings from "../components/NotificationsSettings.jsx";
 export default function ProfilePage() {
   const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
-  const [view, setView] = useState("home");
+  const [view, setView] = useState(() => {
+    const v = new URLSearchParams(window.location.search).get("view");
+    return v === "partner" ? "partner" : "home";
+  });
   const [name, setName] = useState(user?.display_name || "");
   const [cycle, setCycle] = useState(user?.cycle_length_default || 28);
   const [period, setPeriod] = useState(user?.period_length_default || 5);
@@ -501,9 +504,9 @@ export default function ProfilePage() {
 
   if (view === "partner") {
     const OPTS = [
-      { key: "show_feel", label: "Jak mogę się dziś czuć", hint: "Podpowiedź z Twojej historii objawów i nastrojów + jak Cię wspierać" },
+      { key: "show_feel", label: "Jak mogę się dziś czuć", hint: "Dzisiejsze objawy i nastrój z dziennika (bez notatek) + podpowiedzi, jak poprawić Ci dzień" },
       { key: "show_fertile", label: "Dni płodne", hint: "Okno płodne i owulacja (gdy nie stosujesz antykoncepcji)" },
-      { key: "show_pills", label: "Tabletki", hint: "Czy dzisiejsza tabletka jest już wzięta, przerwa w blistrze" },
+      { key: "show_pills", label: "Tabletka / plaster", hint: "Czy i o której wzięłaś dzisiejszą tabletkę, przerwa w blistrze, zmiana plastra" },
     ];
     return (
       <div>
@@ -743,6 +746,12 @@ export default function ProfilePage() {
             <Icon name="users" size={19} />
           </span>
           <span className="sm-title">Partner</span>
+        </button>
+        <button className="set-row" onClick={() => navigate("/para")}>
+          <span className="set-ico">
+            <Icon name="heart" size={19} />
+          </span>
+          <span className="sm-title">Dla par: quiz, randki, czego potrzebuję</span>
         </button>
         <button className="set-row" onClick={() => setView("stats")}>
           <span className="set-ico">

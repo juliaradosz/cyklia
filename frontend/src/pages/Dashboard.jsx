@@ -406,6 +406,13 @@ export default function Dashboard() {
             </div>
             <button
               className="dash-cal"
+              onClick={() => navigate("/para")}
+              aria-label="Dla par"
+            >
+              <Icon name="heart" size={20} />
+            </button>
+            <button
+              className="dash-cal"
               onClick={() => navigate("/kalendarz")}
               aria-label="Kalendarz"
             >

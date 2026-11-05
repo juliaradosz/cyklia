@@ -13,7 +13,6 @@ import {
   LIBIDO,
   MUCUS,
   BLEEDING,
-  DIGESTIVE,
   SEX_ACT,
   PHASE_HINTS,
 } from "../utils.js";
@@ -234,6 +233,7 @@ export default function JournalPage() {
   }
 
   const hint = phaseInfo();
+  const isPeriodDay = !!cal && (cal.days[date] || "normal") === "period";
 
   async function save(e) {
     e.preventDefault();
@@ -584,6 +584,7 @@ export default function JournalPage() {
           )}
         </div>
 
+        {isPeriodDay && (
         <div className="j-section">
           <div className="j-sec-head">
             <span className="js-ico">
@@ -604,6 +605,8 @@ export default function JournalPage() {
             ))}
           </div>
         </div>
+
+        )}
 
         <div className="j-section">
           <div className="j-sec-head">
@@ -655,27 +658,6 @@ export default function JournalPage() {
                 onClick={() => setOne("mucus", m)}
               >
                 {m}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="j-section">
-          <div className="j-sec-head">
-            <span className="js-ico">
-              <Icon name="zap" size={17} />
-            </span>
-            <b>Trawienie</b>
-          </div>
-          <div className="symptoms-grid">
-            {DIGESTIVE.map((d) => (
-              <button
-                key={d}
-                type="button"
-                className={`symptom-chip ${form.digestive.includes(d) ? "on" : ""}`}
-                onClick={() => toggleIn("digestive", d)}
-              >
-                {d}
               </button>
             ))}
           </div>

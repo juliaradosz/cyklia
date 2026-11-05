@@ -12,6 +12,7 @@ import pillsched
 import database as db
 import cycle as cyc
 import predict
+import couples
 import report
 from chat_bot import reply as chat_reply
 
@@ -97,7 +98,7 @@ def create_app():
         for table in (
             "chat_messages", "chat_sessions", "user_articles", "comments", "posts",
             "entries", "cycles", "pill_logs", "patch_logs", "push_subscriptions",
-            "notification_log", "partner_shares",
+            "notification_log", "partner_shares", "couple_quiz", "daily_needs",
         ):
             db.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
         db.execute("DELETE FROM users WHERE id = ?", (user_id,))
@@ -594,7 +595,7 @@ def create_app():
                     user_id, token, (data.get("partner_name") or "").strip()[:40] or None,
                     1 if data.get("show_feel", True) else 0,
                     1 if data.get("show_fertile", True) else 0,
-                    1 if data.get("show_pills", False) else 0,
+                    1 if data.get("show_pills", True) else 0,
                     db.now_iso(),
                 ),
             )
@@ -636,6 +637,61 @@ def create_app():
             (db.now_iso(), share["id"]),
         )
         return jsonify(_partner_view(share))
+
+    @app.post("/api/p/<token>/quiz")
+    def partner_quiz(token):
+        """Partner odpowiada na dzisiejszy quiz dla par."""
+        share = db.query_one("SELECT * FROM partner_shares WHERE token = ?", (token,))
+        if not share or len(token) < 16:
+            return jsonify({"error": "Link wygasł albo został wyłączony."}), 404
+        data = request.get_json(silent=True) or {}
+        err = _save_quiz(share["user_id"], "partner", data.get("answers"))
+        if err:
+            return jsonify({"error": err}), 400
+        return jsonify(_quiz_state(share["user_id"], "partner"))
+
+    # ---------- Dla par: quiz, randki, „czego dziś potrzebuję” ----------
+
+    @app.get("/api/couple")
+    @auth.auth_required
+    def couple_get(user_id):
+        today = localtime.today()
+        phase = _phase_name(user_id)
+        return jsonify({
+            "quiz": _quiz_state(user_id, "her"),
+            "ideas": couples.date_ideas(today, phase, seed=user_id),
+            "phase": phase,
+            "needs_options": couples.NEEDS,
+            "needs": _needs_today(user_id),
+            "has_partner": bool(db.query_one(
+                "SELECT id FROM partner_shares WHERE user_id = ?", (user_id,))),
+        })
+
+    @app.post("/api/couple/quiz")
+    @auth.auth_required
+    def couple_quiz(user_id):
+        data = request.get_json(silent=True) or {}
+        err = _save_quiz(user_id, "her", data.get("answers"))
+        if err:
+            return jsonify({"error": err}), 400
+        return jsonify(_quiz_state(user_id, "her"))
+
+    @app.put("/api/couple/needs")
+    @auth.auth_required
+    def couple_needs(user_id):
+        import json
+
+        data = request.get_json(silent=True) or {}
+        keys = [k for k in (data.get("needs") or []) if k in couples.NEED_KEYS][:6]
+        note = (data.get("note") or "").strip()[:140] or None
+        day = localtime.today().isoformat()
+        db.execute(
+            "INSERT INTO daily_needs (user_id, date, needs, note, updated_at) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(user_id, date) DO UPDATE SET needs = excluded.needs, "
+            "note = excluded.note, updated_at = excluded.updated_at",
+            (user_id, day, json.dumps(keys), note, db.now_iso()),
+        )
+        return jsonify(_needs_today(user_id))
 
     # ---------- Statystyki ----------
 
@@ -1486,17 +1542,153 @@ def _partner_view(share):
             "active_days": pill.get("active_days"),
             "needs_log": pill.get("needs_log"),
             "taken": pill.get("taken"),
+            "taken_at": pill.get("taken_at"),
+            "late": pill.get("late"),
             "expected_time": pill.get("expected_time"),
             "next_pack_start": pill.get("next_pack_start"),
         }
 
+    if share["show_pills"] and ctx.get("method") == "patch" and ctx.get("patch_status"):
+        ps = ctx["patch_status"]
+        out["patch"] = {
+            "message": ps.get("message"),
+            "needs_change": ps.get("needs_change"),
+            "applied": ps.get("applied"),
+        }
+
+    out["week"] = _week_types(user_id, today)
+    out["needs"] = _needs_today(user_id)
+
     if share["show_feel"]:
+        log_syms, log_moods = _today_log(user_id, today_iso)
+        usual_syms = [s["name"] for s in feel.get("symptoms") or []]
         extra = headline + (f", {sub}" if sub else "")
+        if log_syms or log_moods:
+            extra += (
+                ". Dziś sama wpisała w aplikacji — objawy: "
+                + (", ".join(log_syms) or "brak")
+                + "; nastrój: " + (", ".join(log_moods) or "brak")
+            )
+        if out["needs"]["items"]:
+            extra += ". Dziś potrzebuje: " + ", ".join(
+                n["label"].lower() for n in out["needs"]["items"])
         out["feel"] = {
-            "symptoms": [s["name"] for s in feel.get("symptoms") or []],
+            "symptoms": usual_syms,
             "moods": [m["name"] for m in feel.get("moods") or []],
+            "today_symptoms": log_syms,
+            "today_moods": log_moods,
             "text": predict.partner_text(user_id, feel, name, extra),
         }
+        out["tips"] = couples.support_tips(phase, log_syms, log_moods, usual_syms)
+    else:
+        out["tips"] = couples.support_tips(phase)
+
+    out["ideas"] = couples.date_ideas(today, phase, seed=user_id)
+    out["quiz"] = _quiz_state(user_id, "partner")
+    return out
+
+
+def _phase_name(user_id):
+    """Nazwa dzisiejszej fazy (Okres, Faza folikularna, Dni płodne, Owulacja,
+    Faza lutealna, Przerwa) albo None."""
+    try:
+        feel = predict.predict_feel(user_id, localtime.today_iso(), describe=False)
+    except Exception:
+        return None
+    return feel.get("phase_name") or feel.get("phase")
+
+
+def _quiz_state(user_id, role):
+    """Stan dzisiejszego quizu z perspektywy roli: 'her' (ona) albo 'partner'."""
+    import json
+
+    quiz = couples.quiz_for(localtime.today())
+    rows = db.query(
+        "SELECT role, answers FROM couple_quiz WHERE user_id = ? AND date = ?",
+        (user_id, quiz["date"]),
+    )
+    ans = {r["role"]: json.loads(r["answers"]) for r in rows}
+    other = "partner" if role == "her" else "her"
+    mine = ans.get(role)
+    out = dict(quiz)
+    out["mine"] = mine
+    out["other_done"] = other in ans
+    out["result"] = None
+    if mine and other in ans:
+        out["result"] = couples.quiz_summary(quiz, ans.get("her"), ans.get("partner"))
+    return out
+
+
+def _save_quiz(user_id, role, answers):
+    import json
+
+    quiz = couples.quiz_for(localtime.today())
+    if not couples.valid_answers(quiz, answers):
+        return "Odpowiedz na wszystkie pytania."
+    db.execute(
+        "INSERT INTO couple_quiz (user_id, date, role, answers, created_at) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(user_id, date, role) DO UPDATE SET answers = excluded.answers, "
+        "created_at = excluded.created_at",
+        (user_id, quiz["date"], role, json.dumps(answers), db.now_iso()),
+    )
+    return None
+
+
+def _needs_today(user_id):
+    import json
+
+    row = db.query_one(
+        "SELECT needs, note FROM daily_needs WHERE user_id = ? AND date = ?",
+        (user_id, localtime.today_iso()),
+    )
+    keys = json.loads(row["needs"]) if row else []
+    return {
+        "keys": keys,
+        "items": couples.needs_payload(keys),
+        "note": (row["note"] if row else None) or "",
+    }
+
+
+def _today_log(user_id, day):
+    """Objawy i nastroje wpisane dziś w dzienniku (bez notatek i seksu)."""
+    e = db.query_one(
+        "SELECT mood, symptoms FROM entries WHERE user_id = ? AND date = ?", (user_id, day)
+    )
+    if not e:
+        return [], []
+    syms = _parse_json(e["symptoms"], []) or []
+    moods = _parse_json(e["mood"], None)
+    if moods is None:
+        moods = [e["mood"]] if e["mood"] else []
+    if not isinstance(moods, list):
+        moods = [moods]
+    return [s for s in syms if isinstance(s, str)], [m for m in moods if isinstance(m, str)]
+
+
+def _week_types(user_id, today):
+    """Typy dni (okres itd.) w bieżącym tygodniu pon–nd — do paska tygodnia."""
+    cycles = db.query(
+        "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
+    )
+    user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+    starts = [c["start_date"] for c in cycles]
+    ends = [c["end_date"] or None for c in cycles]
+    method = _user_method(user)
+    pred = cyc.build_calendar(
+        starts,
+        cycle_length=user["cycle_length_default"],
+        period_length=user["period_length_default"],
+        pills=method["on"],
+        pill_cycle=method["cycle"],
+        pill_break=method["break"],
+        method=method["method"],
+        pill_start=_pill_anchor(user_id, user),
+    )
+    monday = today - timedelta(days=today.weekday())
+    out = []
+    for i in range(7):
+        d = (monday + timedelta(days=i)).isoformat()
+        out.append({"date": d, "type": cyc.day_type_for(d, starts, ends, pred)})
     return out
 
 

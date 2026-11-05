@@ -13,6 +13,7 @@ import InspiracjeCategoryPage from "./pages/InspiracjeCategoryPage.jsx";
 import InspirationArticlePage from "./pages/InspirationArticlePage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import PartnerPage from "./pages/PartnerPage.jsx";
+import CouplePage from "./pages/CouplePage.jsx";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="inspiracje/kategoria/:category" element={<InspiracjeCategoryPage />} />
         <Route path="inspiracje/:id" element={<InspirationArticlePage />} />
         <Route path="profil" element={<ProfilePage />} />
+        <Route path="para" element={<CouplePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

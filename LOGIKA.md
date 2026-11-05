@@ -1,7 +1,7 @@
 # Cyklia — logika aplikacji
 
 > Ten plik opisuje, **jak działa aplikacja** (reguły, obliczenia, przepływ danych).
-> Jest aktualizowany przy każdej zmianie w kodzie. Ostatnia aktualizacja: 2026-11-04.
+> Jest aktualizowany przy każdej zmianie w kodzie. Ostatnia aktualizacja: 2026-11-05.
 
 ## 1. Architektura
 
@@ -28,6 +28,7 @@
 | `report.py` | Raport PDF dla ginekologa (fpdf2) |
 | `notify.py` | Powiadomienia push (VAPID), wyliczanie należnych przypomnień |
 | `send_reminders.py` | Skrypt do zadania zaplanowanego — wysyła przypomnienia |
+| `couples.py` | Dla par: quiz (tematy dnia), pomysły na randkę, podpowiedzi dla partnera, „czego dziś potrzebuję” |
 | `pills.py`, `patches.py` | Baza tabletek (schematy 21+7, 24+4, 26+2, 28+0) i plastrów |
 | `seed.py`, `articles_library.py` | Artykuły w sekcji Inspiracje |
 
@@ -177,15 +178,21 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   okres”. Dzień przerwy w tabletkach: „Nowy blister”. Nowy okres
   z kalendarza ma długość z profilu.
 - **Objawy (dziennik)**: kolejność sekcji: tabletka/plaster, samopoczucie,
-  objawy, krwawienie, seks i libido, wydzielina, trawienie, ciało, ruch i
-  sen, temperatura i waga, notatka, analiza AI.
+  objawy, krwawienie, seks i libido, wydzielina, ciało, ruch i
+  sen, temperatura i waga, notatka, analiza AI. Sekcji „Trawienie” nie ma
+  (mdłości, wzdęcia, zaparcia, biegunka są w objawach; stare wpisy zostają
+  w bazie). „Krwawienie” pokazuje się **tylko w dzień okresu**.
+- **Dla par** (`/para`; serce na Starcie obok kalendarza, Profil → „Dla par”):
+  „Czego dziś potrzebuję” (do 6 opcji + krótka wiadomość, ważne tylko dziś,
+  widzi je partner), quiz dla par i pomysły na randkę.
 - API odrzuca okres zaczynający się w przyszłości.
 
 ## 9. Dziennik, statystyki, raport, czat
 
 - Dziennik (`PUT /api/entries/<dzień>`): nastrój, objawy, temperatura, waga,
   libido, śluz, stres, sen, woda, aktywność, kroki, seks, krwawienie, trawienie,
-  notatki. Listy zapisywane jako JSON.
+  notatki. Listy zapisywane jako JSON (pole `digestive` zostaje w API dla
+  starych wpisów, ale nie ma go już w formularzu).
 - Statystyki: średnia długość cyklu (odstępy między początkami) i okresu
   (1–21 dni), temperatury, nastroje, objawy, średnie snu/kroków/aktywności
   w fazach (okres / folikularna / lutealna lub przerwa przy tabletkach).
@@ -209,8 +216,30 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   (`predict.partner_text` — statystyka z dziennika + model AI pisze do partnera
   o niej w 3. osobie, z pamięcią na dzień; bez AI szablon zależny od fazy),
   dni płodne (tylko bez antykoncepcji, gdy trwają lub są przed nami), stan
-  tabletki. Nigdy nie pokazuje dziennika, notatek ani aktywności seksualnej.
+  tabletki. Nigdy nie pokazuje notatek ani aktywności seksualnej.
   Usunięcie konta usuwa też link.
+- **Widok partnera wygląda jak Start**: data + pasek tygodnia (dni okresu),
+  odliczanie/dzień okresu, faza; gdy włączone „jak może się czuć” — dzisiejsze
+  nastroje i objawy wpisane w dzienniku (bez notatek). Dalej: „… dziś
+  potrzebuje” (z ekranu Dla par), karta tabletki (wzięta o HH:MM / spóźniona /
+  jeszcze nie wzięta — zwykle o …, przerwa) lub plastra, dni płodne, sekcja
+  **„Jak poprawić jej dzień”** zamiast inspiracji: tekst AI (dzisiejsze wpisy
+  i potrzeby mają pierwszeństwo) + kafelki z konkretnymi podpowiedziami
+  (`couples.support_tips`: najpierw z dzisiejszych nastrojów/objawów, potem
+  z objawów typowych dla tej fazy, potem ogólne dla fazy). Na końcu quiz
+  i pomysły na randkę. Nowe linki mają tabletki włączone domyślnie.
+- **Quiz dla par** (`couple_quiz`: user_id, date, role `her`/`partner`, answers):
+  temat zależy od daty (`date.toordinal() % 12` — 12 tematów po 5 pytań),
+  każde odpowiada o sobie. Ona: `GET /api/couple`, `POST /api/couple/quiz`;
+  partner: `POST /api/p/<token>/quiz`. Wynik (ile zgodnych, %, komentarz,
+  lista pytań z obiema odpowiedziami) widać dopiero, gdy odpowiedzą oboje.
+  Odpowiedzi można zmienić tego samego dnia.
+- **Pomysły na randkę** (`couples.date_ideas`): 28 pomysłów (w domu /
+  aktywnie / na mieście), kolejność losowa, ale stała przez dzień; najpierw
+  te pasujące do fazy (okres, przerwa, lutealna → w domu; folikularna,
+  płodne, owulacja → aktywnie/na mieście). Pokazywane po 3, „Inne pomysły”.
+- **Czego dziś potrzebuję** (`daily_needs`: user_id, date, needs, note):
+  `PUT /api/couple/needs`; w widoku partnera tylko z dzisiejszej daty.
 
 ## 10. Historia zmian logiki
 
@@ -231,3 +260,8 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   został wycofany, dodany automatyczny model zapasowy.
 - **2026-11-05 (2)** — udostępnianie partnerowi: prywatny link tylko do
   odczytu z dzisiejszym stanem cyklu i podpowiedzią AI, jak wspierać.
+- **2026-11-05 (3)** — widok partnera jak Start (pasek tygodnia, dzisiejsze
+  nastroje/objawy, „Jak poprawić jej dzień” z podpowiedziami), wyraźna
+  informacja o tabletce (godzina wzięcia), ekran „Dla par”: czego dziś
+  potrzebuję, codzienny quiz dla par z podsumowaniem zgodności, pomysły na
+  randkę; w dzienniku usunięte „Trawienie”, „Krwawienie” tylko w dni okresu.

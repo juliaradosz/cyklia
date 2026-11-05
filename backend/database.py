@@ -163,6 +163,28 @@ CREATE TABLE IF NOT EXISTS partner_shares (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS couple_quiz (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    role TEXT NOT NULL,
+    answers TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, date, role),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS daily_needs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    needs TEXT NOT NULL DEFAULT '[]',
+    note TEXT,
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, date),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS chat_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
