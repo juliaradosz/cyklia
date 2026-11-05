@@ -12,6 +12,7 @@ import InspiracjePage from "./pages/InspiracjePage.jsx";
 import InspiracjeCategoryPage from "./pages/InspiracjeCategoryPage.jsx";
 import InspirationArticlePage from "./pages/InspirationArticlePage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
+import PartnerPage from "./pages/PartnerPage.jsx";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -25,6 +26,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/partner/:token" element={<PartnerPage />} />
       <Route path="/register" element={user ? <Navigate to="/" replace /> : <RegisterPage />} />
       <Route
         path="/"

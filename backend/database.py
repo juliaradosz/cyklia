@@ -150,6 +150,19 @@ CREATE TABLE IF NOT EXISTS comments (
     FOREIGN KEY (user_id) REFERENCES users (id)
 );
 
+CREATE TABLE IF NOT EXISTS partner_shares (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER UNIQUE NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    partner_name TEXT,
+    show_feel INTEGER DEFAULT 1,
+    show_fertile INTEGER DEFAULT 1,
+    show_pills INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    last_viewed_at TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS chat_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,

@@ -3912,3 +3912,43 @@ select {
   padding-bottom: calc(104px + env(safe-area-inset-bottom));
   overflow-y: auto;
 }
+
+/* ---------- Widok partnera ---------- */
+.partner-page {
+  max-width: 520px;
+  margin: 0 auto;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+.partner-head {
+  text-align: center;
+  margin: 10px 0 18px;
+}
+.partner-head h1 {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin: 10px 0 2px;
+}
+.partner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pink-600);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: var(--r-pill);
+  padding: 5px 12px;
+}
+.partner-status {
+  padding: 22px 18px;
+}
+.partner-link {
+  font-size: 12.5px;
+  word-break: break-all;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  user-select: all;
+}

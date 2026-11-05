@@ -115,7 +115,7 @@ def _cycle_day(day, starts):
     return (day - prev).days + 1
 
 
-def predict_feel(user_id, day):
+def predict_feel(user_id, day, describe=True):
     """Zwraca przewidywane objawy i nastrój na dany dzień (słownik JSON)."""
     user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
     if not user:
@@ -223,7 +223,8 @@ def predict_feel(user_id, day):
         "moods": moods,
         "empty": False,
     }
-    result["text"] = _describe(result)
+    if describe:
+        result["text"] = _describe(result)
     return result
 
 
@@ -472,3 +473,88 @@ def _llm_analyze(stats):
         )
     except Exception:
         return None
+
+
+# ---------- Widok dla partnera ----------
+
+_PARTNER_TIPS = {
+    "Okres": "Może mieć mniej energii, skurcze albo bóle brzucha. Pomoże ciepły "
+             "termofor, coś dobrego do jedzenia, spokojny wieczór i mniej obowiązków na jej głowie.",
+    "Przerwa": "To przerwa w tabletkach — zwykle pojawia się wtedy krwawienie i bywa "
+               "mniej energii. Ciepło, cierpliwość i odciążenie w obowiązkach bardzo pomagają.",
+    "Faza folikularna": "To zwykle czas rosnącej energii i lepszego nastroju — dobry moment "
+                        "na wspólne aktywności, spacer czy wyjście.",
+    "Dni płodne": "Energia i ochota na bliskość często są wtedy większe. "
+                  "Jeśli nie planujecie ciąży, pamiętajcie o zabezpieczeniu.",
+    "Owulacja": "Szczyt energii w cyklu — często lepszy nastrój i więcej ochoty na bliskość. "
+                "Jeśli nie planujecie ciąży, pamiętajcie o zabezpieczeniu.",
+    "Faza lutealna": "Przed okresem mogą pojawić się zmęczenie, drażliwość, wzdęcia czy "
+                     "tkliwość piersi. Więcej cierpliwości, przytulenie i drobne gesty robią różnicę.",
+}
+
+_partner_cache = {}
+
+
+def partner_text(user_id, feel, name, extra=""):
+    """Krótka podpowiedź dla partnera: jak ona może się dziś czuć i jak ją wspierać.
+    Najpierw model AI (z pamięcią na dzień), potem lokalny szablon."""
+    import chat_bot
+
+    key = (user_id, feel.get("date"), feel.get("phase"), feel.get("sample_count"), extra)
+    if key in _partner_cache:
+        return _partner_cache[key]
+
+    phase = feel.get("phase_name") or feel.get("phase")
+    syms = ", ".join(s["name"] for s in feel.get("symptoms") or []) or "brak danych"
+    mds = ", ".join(m["name"] for m in feel.get("moods") or []) or "brak danych"
+    text = None
+    api_url, api_key, model = chat_bot._load_groq_config()
+    if api_url and api_key:
+        user_msg = (
+            f"Piszesz do partnera użytkowniczki o imieniu {name}. "
+            f"Dziś: {extra or 'brak szczegółów'}. Faza cyklu: {phase or 'nieznana'}. "
+            f"W podobne dni {name} najczęściej notowała objawy: {syms}; nastroje: {mds}. "
+            f"Napisz 2–4 zdania po polsku, zwracając się do partnera na „ty”: jak {name} "
+            "może się dziś czuć i jak może ją wesprzeć. Ciepło, konkretnie, bez list, "
+            "procentów i bez straszenia. O niej pisz w trzeciej osobie (ona)."
+        )
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Jesteś empatycznym asystentem aplikacji Cyklia, który pomaga "
+                    "partnerom rozumieć cykl miesiączkowy bliskiej osoby. Odpowiadasz "
+                    "po polsku, zwięźle. To treść edukacyjna, nie diagnoza."
+                ),
+            },
+            {"role": "user", "content": user_msg},
+        ]
+        try:
+            text = chat_bot.call_llm(
+                api_url, api_key, model, messages,
+                temperature=0.7, timeout=30, tag="partner",
+            )
+        except Exception:
+            text = None
+    if not text:
+        parts = []
+        if feel.get("symptoms") or feel.get("moods"):
+            bits = []
+            if feel.get("symptoms"):
+                bits.append("objawy: " + syms)
+            if feel.get("moods"):
+                bits.append("nastrój: " + mds)
+            parts.append(f"W podobne dni {name} zwykle notuje — " + "; ".join(bits) + ".")
+        tip = _PARTNER_TIPS.get(phase or "")
+        if tip:
+            parts.append(tip)
+        if not parts:
+            parts.append(
+                f"Najlepiej po prostu zapytaj {name}, jak się dziś czuje — "
+                "uważność i drobne gesty zawsze pomagają."
+            )
+        text = " ".join(parts)
+    if len(_partner_cache) > 500:
+        _partner_cache.clear()
+    _partner_cache[key] = text
+    return text

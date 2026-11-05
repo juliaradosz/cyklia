@@ -35,6 +35,52 @@ export default function ProfilePage() {
   const [pwMsg, setPwMsg] = useState("");
   const [delPw, setDelPw] = useState("");
   const [delMsg, setDelMsg] = useState("");
+  const [share, setShare] = useState(undefined);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareMsg, setShareMsg] = useState("");
+
+  useEffect(() => {
+    if (view !== "partner" || share !== undefined) return;
+    api("/partner")
+      .then((s) => setShare(s))
+      .catch((e) => {
+        setShare(null);
+        setShareMsg(e.message);
+      });
+  }, [view, share]);
+
+  const shareUrl = share ? `${window.location.origin}/partner/${share.token}` : "";
+
+  async function shareCall(method, body) {
+    setShareBusy(true);
+    setShareMsg("");
+    try {
+      const s = await api("/partner", { method, body });
+      setShare(s);
+      return s;
+    } catch (e) {
+      setShareMsg(e.message);
+      return null;
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
+  async function sendLink() {
+    const url = shareUrl;
+    if (!url) return;
+    const text = `Tutaj zobaczysz, w którym momencie cyklu jestem i jak mogę się dziś czuć 💗`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Cyklia", text, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareMsg("✓ Skopiowano link");
+    } catch (e) {
+      if (e?.name !== "AbortError") setShareMsg("Skopiuj link ręcznie z pola powyżej.");
+    }
+  }
 
   useEffect(() => {
     api("/pills")
@@ -453,6 +499,121 @@ export default function ProfilePage() {
     );
   }
 
+  if (view === "partner") {
+    const OPTS = [
+      { key: "show_feel", label: "Jak mogę się dziś czuć", hint: "Podpowiedź z Twojej historii objawów i nastrojów + jak Cię wspierać" },
+      { key: "show_fertile", label: "Dni płodne", hint: "Okno płodne i owulacja (gdy nie stosujesz antykoncepcji)" },
+      { key: "show_pills", label: "Tabletki", hint: "Czy dzisiejsza tabletka jest już wzięta, przerwa w blistrze" },
+    ];
+    return (
+      <div>
+        <div className="sub-screen-head">
+          <button className="icon-btn" onClick={() => setView("home")} aria-label="Wróć">
+            <Icon name="chevron-left" size={20} />
+          </button>
+          <h1>Partner</h1>
+        </div>
+
+        <div className="j-section">
+          <div className="j-sec-head">
+            <span className="js-ico">
+              <Icon name="users" size={17} />
+            </span>
+            <b>Udostępnij partnerowi</b>
+          </div>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Partner dostaje prywatny link (bez zakładania konta) i widzi tylko
+            dzisiejszy stan: dzień okresu lub cyklu, ile dni do okresu oraz to,
+            co włączysz poniżej. Nie widzi Twojego dziennika ani notatek.
+          </p>
+
+          {share === undefined ? (
+            <p className="muted">Ładowanie…</p>
+          ) : share ? (
+            <>
+              <div className="partner-link">{shareUrl}</div>
+              <button className="btn block" onClick={sendLink}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <Icon name="send" size={16} /> Wyślij link partnerowi
+                </span>
+              </button>
+              <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
+                {share.last_viewed_at
+                  ? `Ostatnio otwarty: ${new Date(share.last_viewed_at).toLocaleString("pl-PL", {
+                      day: "numeric",
+                      month: "long",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}`
+                  : "Partner jeszcze nie otworzył linku."}
+              </p>
+            </>
+          ) : (
+            <button className="btn block" disabled={shareBusy} onClick={() => shareCall("POST", {})}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <Icon name="link" size={16} /> Utwórz link dla partnera
+              </span>
+            </button>
+          )}
+          {shareMsg && (
+            <div className={shareMsg.startsWith("✓") ? "muted" : "error"} style={{ marginTop: 10 }}>
+              {shareMsg}
+            </div>
+          )}
+        </div>
+
+        {share && (
+          <>
+            <div className="settings-group" style={{ padding: 0 }}>
+              <div className="settings-title" style={{ padding: "12px 18px 0" }}>
+                Co widzi partner
+              </div>
+              {OPTS.map((o) => (
+                <div className="set-switch" key={o.key}>
+                  <span style={{ minWidth: 0 }}>
+                    <span className="sw-label">{o.label}</span>
+                    <span className="muted" style={{ display: "block", fontSize: 12 }}>
+                      {o.hint}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="switch"
+                    checked={!!share[o.key]}
+                    disabled={shareBusy}
+                    onChange={(e) => shareCall("PATCH", { [o.key]: e.target.checked })}
+                    aria-label={o.label}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <button
+              className="btn ghost block"
+              disabled={shareBusy}
+              onClick={() => {
+                if (window.confirm("Utworzyć nowy link? Stary przestanie działać.")) shareCall("POST", {});
+              }}
+            >
+              Utwórz nowy link (stary przestanie działać)
+            </button>
+            <button
+              className="sheet-btn danger"
+              style={{ marginTop: 10 }}
+              disabled={shareBusy}
+              onClick={async () => {
+                if (!window.confirm("Wyłączyć udostępnianie? Partner straci dostęp.")) return;
+                await shareCall("DELETE");
+              }}
+            >
+              <Icon name="x" size={17} /> Wyłącz udostępnianie
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
   if (view === "notifications") {
     return (
       <div>
@@ -576,6 +737,12 @@ export default function ProfilePage() {
             <Icon name="bell" size={19} />
           </span>
           <span className="sm-title">Powiadomienia</span>
+        </button>
+        <button className="set-row" onClick={() => setView("partner")}>
+          <span className="set-ico">
+            <Icon name="users" size={19} />
+          </span>
+          <span className="sm-title">Partner</span>
         </button>
         <button className="set-row" onClick={() => setView("stats")}>
           <span className="set-ico">

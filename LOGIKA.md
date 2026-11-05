@@ -163,6 +163,12 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
 - Przycisk „Dodaj okres / Edytuj okres” otwiera arkusz z datą początku i
   końca (dodawanie, gdy okres nie trwa; edycja i usuwanie, gdy trwa).
   Pod spodem (gdy okres trwa): „Okres skończył się dziś”.
+- **Partner** (Profil → Partner): przycisk „Utwórz link dla partnera” tworzy
+  prywatny link `/partner/<token>` (bez konta dla partnera). „Wyślij link
+  partnerowi” otwiera systemowe udostępnianie (lub kopiuje link). Przełączniki
+  „Co widzi partner”: jak mogę się dziś czuć, dni płodne, tabletki (domyślnie
+  wyłączone). Widać, kiedy partner ostatnio otworzył link. „Utwórz nowy link”
+  unieważnia stary, „Wyłącz udostępnianie” usuwa dostęp.
 - **Kalendarz**: legenda; okres zarejestrowany = pełne różowe kółko,
   prognoza (3 kolejne okresy) = przerywane obramowanie, dni płodne =
   jasnoniebieskie, owulacja = niebieskie (tylko bez antykoncepcji), ikonka
@@ -194,6 +200,18 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   Model zwraca się do użytkowniczki w formie żeńskiej. Asystent dostaje kontekst kalendarza
   (dzień cyklu, następny okres, owulacja, tabletka/plaster).
 
+- Partner (`partner_shares`: token, przełączniki `show_feel`, `show_fertile`,
+  `show_pills`, `last_viewed_at`): `GET/POST/PATCH/DELETE /api/partner`
+  (zalogowana użytkowniczka) i publiczne `GET /api/p/<token>` (bez logowania).
+  Widok zawsze pokazuje: nagłówek jak na Starcie (okres + dzień / przerwa
+  w tabletkach / X dni do okresu), dzień cyklu (bez antykoncepcji), fazę
+  i datę następnego okresu. Opcjonalnie: podpowiedź „jak może się dziś czuć”
+  (`predict.partner_text` — statystyka z dziennika + model AI pisze do partnera
+  o niej w 3. osobie, z pamięcią na dzień; bez AI szablon zależny od fazy),
+  dni płodne (tylko bez antykoncepcji, gdy trwają lub są przed nami), stan
+  tabletki. Nigdy nie pokazuje dziennika, notatek ani aktywności seksualnej.
+  Usunięcie konta usuwa też link.
+
 ## 10. Historia zmian logiki
 
 - **2026-11-04** — strefa czasowa Polski na serwerze; poprawiona kotwica
@@ -211,3 +229,5 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   „Okres zaczął się dziś” ze Startu; naprawione AI (asystent, analiza
   dziennika, „jak możesz się czuć”) — model Groq `llama-3.3-70b-versatile`
   został wycofany, dodany automatyczny model zapasowy.
+- **2026-11-05 (2)** — udostępnianie partnerowi: prywatny link tylko do
+  odczytu z dzisiejszym stanem cyklu i podpowiedzią AI, jak wspierać.

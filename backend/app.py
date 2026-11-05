@@ -97,7 +97,7 @@ def create_app():
         for table in (
             "chat_messages", "chat_sessions", "user_articles", "comments", "posts",
             "entries", "cycles", "pill_logs", "patch_logs", "push_subscriptions",
-            "notification_log",
+            "notification_log", "partner_shares",
         ):
             db.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
         db.execute("DELETE FROM users WHERE id = ?", (user_id,))
@@ -564,6 +564,78 @@ def create_app():
             days[d.isoformat()] = cyc.day_type_for(d.isoformat(), starts, ends, pred)
             d += __import__("datetime").timedelta(days=1)
         return jsonify({"prediction": pred, "days": days})
+
+    # ---------- Partner: prywatny link tylko do odczytu ----------
+
+    @app.get("/api/partner")
+    @auth.auth_required
+    def partner_get(user_id):
+        return jsonify(_partner_share(user_id))
+
+    @app.post("/api/partner")
+    @auth.auth_required
+    def partner_create(user_id):
+        """Tworzy link dla partnera albo generuje nowy (stary przestaje działać)."""
+        import secrets
+
+        data = request.get_json(silent=True) or {}
+        token = secrets.token_urlsafe(18)
+        existing = db.query_one("SELECT id FROM partner_shares WHERE user_id = ?", (user_id,))
+        if existing:
+            db.execute(
+                "UPDATE partner_shares SET token = ?, created_at = ?, last_viewed_at = NULL WHERE user_id = ?",
+                (token, db.now_iso(), user_id),
+            )
+        else:
+            db.execute(
+                "INSERT INTO partner_shares (user_id, token, partner_name, show_feel, "
+                "show_fertile, show_pills, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    user_id, token, (data.get("partner_name") or "").strip()[:40] or None,
+                    1 if data.get("show_feel", True) else 0,
+                    1 if data.get("show_fertile", True) else 0,
+                    1 if data.get("show_pills", False) else 0,
+                    db.now_iso(),
+                ),
+            )
+        return jsonify(_partner_share(user_id))
+
+    @app.patch("/api/partner")
+    @auth.auth_required
+    def partner_update(user_id):
+        data = request.get_json(silent=True) or {}
+        if not db.query_one("SELECT id FROM partner_shares WHERE user_id = ?", (user_id,)):
+            return jsonify({"error": "Najpierw utwórz link dla partnera"}), 404
+        for col in ("show_feel", "show_fertile", "show_pills"):
+            if col in data:
+                db.execute(
+                    f"UPDATE partner_shares SET {col} = ? WHERE user_id = ?",
+                    (1 if data[col] else 0, user_id),
+                )
+        if "partner_name" in data:
+            db.execute(
+                "UPDATE partner_shares SET partner_name = ? WHERE user_id = ?",
+                ((data.get("partner_name") or "").strip()[:40] or None, user_id),
+            )
+        return jsonify(_partner_share(user_id))
+
+    @app.delete("/api/partner")
+    @auth.auth_required
+    def partner_delete(user_id):
+        db.execute("DELETE FROM partner_shares WHERE user_id = ?", (user_id,))
+        return jsonify(None)
+
+    @app.get("/api/p/<token>")
+    def partner_view(token):
+        """Publiczny widok dla partnera — bez logowania, tylko z tokenem."""
+        share = db.query_one("SELECT * FROM partner_shares WHERE token = ?", (token,))
+        if not share or len(token) < 16:
+            return jsonify({"error": "Link wygasł albo został wyłączony."}), 404
+        db.execute(
+            "UPDATE partner_shares SET last_viewed_at = ? WHERE id = ?",
+            (db.now_iso(), share["id"]),
+        )
+        return jsonify(_partner_view(share))
 
     # ---------- Statystyki ----------
 
@@ -1316,6 +1388,116 @@ def _chat_context(user_id):
         "days_to_period": days_to_period,
         "today_type": today_type,
     }
+
+
+def _partner_share(user_id):
+    share = db.query_one("SELECT * FROM partner_shares WHERE user_id = ?", (user_id,))
+    if not share:
+        return None
+    return {
+        "token": share["token"],
+        "partner_name": share["partner_name"] or "",
+        "show_feel": bool(share["show_feel"]),
+        "show_fertile": bool(share["show_fertile"]),
+        "show_pills": bool(share["show_pills"]),
+        "created_at": share["created_at"],
+        "last_viewed_at": share["last_viewed_at"],
+    }
+
+
+def _partner_view(share):
+    """Dzisiejszy stan cyklu w formie dla partnera (bez dziennika i notatek)."""
+    user_id = share["user_id"]
+    user = db.query_one("SELECT * FROM users WHERE id = ?", (user_id,))
+    name = (user.get("display_name") or "").strip() or "Twoja partnerka"
+    ctx = _chat_context(user_id)
+    today = localtime.today()
+    today_iso = today.isoformat()
+    cycles = db.query(
+        "SELECT * FROM cycles WHERE user_id = ? ORDER BY start_date", (user_id,)
+    )
+
+    period_day = None
+    if ctx.get("today_type") == "period":
+        past = [c["start_date"] for c in cycles if c["start_date"] <= today_iso]
+        if past:
+            period_day = (today - datetime.strptime(past[-1], "%Y-%m-%d").date()).days + 1
+
+    pill = None
+    if ctx.get("method") == "pill":
+        try:
+            pill = _pill_status(user_id, today_iso)
+        except Exception:
+            pill = None
+    in_break = bool(pill and pill.get("in_break"))
+
+    dtp = ctx.get("days_to_period")
+    if period_day:
+        headline, sub = "Okres", f"Dzień {period_day}"
+    elif in_break:
+        headline = "Przerwa w tabletkach"
+        sub = f"Dzień {-pill['pack_day']} z {pill['break_days']}"
+    elif dtp is not None:
+        if dtp > 0:
+            headline = f"{dtp} {'dzień' if dtp == 1 else 'dni'} do okresu"
+        elif dtp == 0:
+            headline = "Okres — dziś"
+        else:
+            headline = f"{-dtp} dni po terminie"
+        sub = f"{ctx['cycle_day']}. dzień cyklu" if ctx.get("cycle_day") and not ctx.get("on_pills") else ""
+    else:
+        headline, sub = "Brak danych o cyklu", ""
+
+    feel = predict.predict_feel(user_id, today_iso, describe=False)
+    phase = feel.get("phase_name") or feel.get("phase")
+    if not phase and in_break:
+        phase = "Przerwa"
+    if not phase and ctx.get("on_pills"):
+        phase = None
+    feel["phase_name"] = phase
+
+    out = {
+        "name": name,
+        "date": today_iso,
+        "headline": headline,
+        "sub": sub,
+        "phase": phase,
+        "period_day": period_day,
+        "cycle_day": ctx.get("cycle_day") if not ctx.get("on_pills") else None,
+        "days_to_period": dtp,
+        "next_period_start": ctx.get("next_period_start"),
+        "contraception": ctx.get("method") is not None,
+    }
+
+    if share["show_fertile"] and not ctx.get("on_pills") and ctx.get("fertile_start"):
+        tt = ctx.get("today_type")
+        out["fertile"] = {
+            "today": tt in ("fertile", "ovulation"),
+            "ovulation_today": tt == "ovulation",
+            "start": ctx.get("fertile_start"),
+            "end": ctx.get("fertile_end"),
+            "ovulation": ctx.get("ovulation_date"),
+        }
+
+    if share["show_pills"] and pill:
+        out["pills"] = {
+            "in_break": in_break,
+            "pack_day": pill.get("pack_day"),
+            "active_days": pill.get("active_days"),
+            "needs_log": pill.get("needs_log"),
+            "taken": pill.get("taken"),
+            "expected_time": pill.get("expected_time"),
+            "next_pack_start": pill.get("next_pack_start"),
+        }
+
+    if share["show_feel"]:
+        extra = headline + (f", {sub}" if sub else "")
+        out["feel"] = {
+            "symptoms": [s["name"] for s in feel.get("symptoms") or []],
+            "moods": [m["name"] for m in feel.get("moods") or []],
+            "text": predict.partner_text(user_id, feel, name, extra),
+        }
+    return out
 
 
 def _to_json_list(value):
