@@ -471,7 +471,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {isTodayView && !patchMode && onPills && pillLog && (pillLog.needs_log || pillLog.in_break) && (
+      {isTodayView && !patchMode && onPills && pillLog && !pillLog.taken && (pillLog.needs_log || pillLog.in_break) && (
         <div className={`dash-pill${pillLog.taken ? " done" : ""}${pillLog.late ? " late" : ""}`}>
           <div className="dp-row">
             <div className="dp-ico">
@@ -619,19 +619,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {isTodayView && !currentPeriod && (
-        <button
-          className="btn ghost block mt"
-          onClick={async () => {
-            await addPeriod(today, undefined, 1);
-            reload();
-          }}
-        >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Icon name="droplet" size={17} /> Okres zaczął się dziś
-          </span>
-        </button>
-      )}
       {isTodayView && currentPeriod && !currentPeriod.end_date && (
         <button className="btn ghost block mt" onClick={endPeriodToday}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>

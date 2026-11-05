@@ -33,6 +33,61 @@ def _load_groq_config():
         return None, None, None
 
 
+# Modele zapasowe (Groq co jakiś czas wycofuje modele — np. llama-3.3-70b-versatile
+# przestała istnieć). Jeśli skonfigurowany model zwraca "model_not_found",
+# próbujemy kolejnych i zapamiętujemy ten, który zadziałał.
+FALLBACK_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
+_working_model = None
+
+
+def _strip_think(text):
+    import re
+    return re.sub(r"<think>.*?</think>", "", text or "", flags=re.S).strip()
+
+
+def call_llm(api_url, api_key, model, messages, temperature=0.6, timeout=30, tag="asystent"):
+    """Wywołuje endpoint OpenAI-compatible; przy wycofanym modelu przechodzi na zapasowy."""
+    global _working_model
+    import urllib.error
+
+    candidates = []
+    for m in [_working_model, model, *FALLBACK_MODELS]:
+        if m and m not in candidates:
+            candidates.append(m)
+    last_err = None
+    for m in candidates:
+        body = {"model": m, "messages": messages, "temperature": temperature}
+        req = urllib.request.Request(
+            api_url,
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + api_key,
+                "User-Agent": f"Cyklia/1.0 ({tag})",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            last_err = e
+            if e.code in (400, 404):
+                try:
+                    detail = e.read().decode("utf-8", "ignore")
+                except Exception:
+                    detail = ""
+                if "model" in detail:
+                    continue  # model wycofany / niedostępny — próbuj kolejnego
+            raise
+        text = _strip_think(data["choices"][0]["message"].get("content"))
+        if not text:
+            last_err = RuntimeError("pusta odpowiedź modelu")
+            continue
+        _working_model = m
+        return text
+    raise last_err or RuntimeError("brak dostępnego modelu")
+
+
 def _pick(topics, user_message):
     msg = user_message.lower()
     return any(t in msg for t in topics)
@@ -557,6 +612,7 @@ def llm_reply(message, api_url, api_key, model, history, context=None):
                     "Jesteś uprzejmym asystentem zdrowia kobiet i śledzenia cyklu "
                     "miesiączkowego (aplikacja Cyklia). Odpowiadaj po polsku, zwięźle, "
                     "życzliwie i empatycznie. To treści edukacyjne, nie diagnoza. "
+                    "Zwracaj się do użytkowniczki w formie żeńskiej (np. „zauważyłaś”). "
                     f"Przy poważnych objawach doradzaj konsultację z lekarzem. {ctx_note}"
                 ),
             },
@@ -565,18 +621,7 @@ def llm_reply(message, api_url, api_key, model, history, context=None):
         ],
         "temperature": 0.6,
     }
-    req = urllib.request.Request(
-        api_url,
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + api_key,
-            "User-Agent": "Cyklia/1.0 (asystent zdrowia)",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    return data["choices"][0]["message"]["content"].strip()
+    return call_llm(api_url, api_key, model, body["messages"], temperature=0.6, timeout=30)
 
 
 def reply(message, history=None, context=None):

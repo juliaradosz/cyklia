@@ -156,13 +156,13 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   W przerwie między blistrami: „Przerwa w tabletkach / Dzień X z Y · nowy
   blister …” (bez mylącego odliczania do okresu za miesiąc).
 - **Karta tabletki** (Start): w dzień aktywny przycisk „Wzięłam” (zapisuje
-  bieżącą godzinę; „Wzięłam o innej godzinie” pozwala ją zmienić), po
-  zapisaniu zielony stan z „Cofnij” i ewentualnym ostrzeżeniem o spóźnieniu.
+  bieżącą godzinę; „Wzięłam o innej godzinie” pozwala ją zmienić). Po
+  zaznaczeniu tabletki karta znika ze Startu (cofnąć można w dzienniku/kalendarzu).
   W przerwie: „Dziś bez tabletki” + „Zaczynam nowy blister dziś” (z
   potwierdzeniem).
 - Przycisk „Dodaj okres / Edytuj okres” otwiera arkusz z datą początku i
   końca (dodawanie, gdy okres nie trwa; edycja i usuwanie, gdy trwa).
-  Pod spodem: „Okres zaczął się dziś” albo „Okres skończył się dziś”.
+  Pod spodem (gdy okres trwa): „Okres skończył się dziś”.
 - **Kalendarz**: legenda; okres zarejestrowany = pełne różowe kółko,
   prognoza (3 kolejne okresy) = przerywane obramowanie, dni płodne =
   jasnoniebieskie, owulacja = niebieskie (tylko bez antykoncepcji), ikonka
@@ -187,7 +187,11 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   w tej samej fazie; opis z modelu AI, a bez konfiguracji — lokalny szablon.
 - Raport PDF dla ginekologa: `GET /api/report/pdf` (fpdf2, czcionki DejaVu).
 - Czat: rozmowy w sesjach; odpowiedź z modelu AI (zmienne `CYKLIA_LLM_*` albo
-  `groq_key.py`) lub z lokalnych reguł. Asystent dostaje kontekst kalendarza
+  `groq_key.py`) lub z lokalnych reguł. Wszystkie wywołania AI idą przez
+  `chat_bot.call_llm`: gdy skonfigurowany model jest wycofany
+  (`model_not_found`), próbuje modeli zapasowych (`openai/gpt-oss-120b`,
+  `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`) i zapamiętuje działający.
+  Model zwraca się do użytkowniczki w formie żeńskiej. Asystent dostaje kontekst kalendarza
   (dzień cyklu, następny okres, owulacja, tabletka/plaster).
 
 ## 10. Historia zmian logiki
@@ -203,3 +207,7 @@ Każde przypomnienie wysyłane **najwyżej raz dziennie** (tabela `notification_
   pokazywany w dniu prognozy; nowa karta tabletki; dodawanie/kończenie/
   usuwanie okresu ze Startu i kalendarza; prognoza, dni płodne i legenda
   w kalendarzu; blokada dat w przyszłości; nowa kolejność dziennika.
+- **2026-11-05** — karta tabletki znika po zaznaczeniu; usunięty przycisk
+  „Okres zaczął się dziś” ze Startu; naprawione AI (asystent, analiza
+  dziennika, „jak możesz się czuć”) — model Groq `llama-3.3-70b-versatile`
+  został wycofany, dodany automatyczny model zapasowy.

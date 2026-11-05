@@ -287,26 +287,19 @@ def _llm_describe(r):
                 "role": "system",
                 "content": (
                     "Jesteś empatycznym asystentem zdrowia kobiet w aplikacji Cyklia. "
-                    "Odpowiadasz po polsku, zwięźle. To treść edukacyjna, nie diagnoza."
+                    "Odpowiadasz po polsku, zwięźle. To treść edukacyjna, nie diagnoza. "
+                    "Zwracaj się do użytkowniczki w formie żeńskiej (np. „zauważyłaś”)."
                 ),
             },
             {"role": "user", "content": user},
         ],
         "temperature": 0.7,
     }
-    req = urllib.request.Request(
-        api_url,
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + api_key,
-            "User-Agent": "Cyklia/1.0 (podpowiedzi)",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        return data["choices"][0]["message"]["content"].strip()
+        return chat_bot.call_llm(
+            api_url, api_key, model, body["messages"],
+            temperature=0.7, timeout=30, tag="podpowiedzi",
+        )
     except Exception:
         return None
 
@@ -454,7 +447,8 @@ def _llm_analyze(stats):
                     "Jesteś empatycznym asystentem zdrowia kobiet w aplikacji Cyklia. "
                     "Analizujesz dziennik użytkowniczki: objawy, nastrój, sen, stres. "
                     "Odpowiadasz po polsku, ciepło i konkretnie, w 3–6 zdaniach, "
-                    "bez list i procentów. To treść edukacyjna, nie diagnoza."
+                    "bez list i procentów. To treść edukacyjna, nie diagnoza. "
+                    "Zwracaj się do użytkowniczki w formie żeńskiej (np. „zauważyłaś”)."
                 ),
             },
             {
@@ -471,18 +465,10 @@ def _llm_analyze(stats):
         ],
         "temperature": 0.7,
     }
-    req = urllib.request.Request(
-        api_url,
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + api_key,
-            "User-Agent": "Cyklia/1.0 (analiza dziennika)",
-        },
-    )
     try:
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        return data["choices"][0]["message"]["content"].strip()
+        return chat_bot.call_llm(
+            api_url, api_key, model, body["messages"],
+            temperature=0.7, timeout=45, tag="analiza dziennika",
+        )
     except Exception:
         return None
